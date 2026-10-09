@@ -1,0 +1,39 @@
+# Version control
+.git
+.gitignore
+
+# Editors / OS
+.vscode
+.idea
+*.swp
+.DS_Store
+
+# Next.js build cache (regenerated on build)
+.next/cache
+
+# Local env files (secrets must not be baked into the image)
+.env
+.env.*
+!.env.example
+
+# TypeScript declaration / incremental build artifacts
+tsconfig.tsbuildinfo
+
+# Coverage / test output
+coverage
+*.lcov
+
+# Docker artifacts
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Build outputs and generated clients are recreated inside the image.
+node_modules
+.next
+out
+src/.prisma-client
+src/.prisma-client-v2
+src/.prisma-generated
+src/generated
+*.tsbuildinfo
