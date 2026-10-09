@@ -1,11 +1,28 @@
 import { connection, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { apiError, isDateString, readJsonBody } from "@/lib/api-response";
+import { getCategoryColor, isEventCategory } from "@/lib/categories";
+import { requireUserId } from "@/lib/auth";
 
 export async function GET() {
   await connection();
+  const userId = await requireUserId();
+  if (!userId) {
+    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  }
   try {
-    const events = await prisma.calendarEvent.findMany({ orderBy: [{ date: "asc" }, { time: "asc" }] });
+    // Personal events plus the shared events of family groups the user belongs to.
+    const memberships = await prisma.familyGroupMember.findMany({
+      where: { userId },
+      select: { groupId: true },
+    });
+    const groupIds = memberships.map((membership) => membership.groupId);
+    const events = await prisma.calendarEvent.findMany({
+      where: {
+        OR: [{ familyGroupId: null }, { familyGroupId: { in: groupIds } }],
+      },
+      orderBy: [{ date: "asc" }, { time: "asc" }],
+    });
     return NextResponse.json(events);
   } catch (error) {
     return apiError(error, "Listing calendar events", "Unable to load events.");
@@ -13,9 +30,14 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  await connection();
+  const userId = await requireUserId();
+  if (!userId) {
+    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  }
   const parsed = await readJsonBody(req);
   if ("response" in parsed) return parsed.response;
-  const { title, date, time, color } = parsed.body;
+  const { title, date, time, color, category } = parsed.body;
   if (typeof title !== "string" || !title.trim()) {
     return NextResponse.json({ error: "title is required." }, { status: 400 });
   }
@@ -28,9 +50,25 @@ export async function POST(req: Request) {
   if (color !== undefined && typeof color !== "string") {
     return NextResponse.json({ error: "color must be a string." }, { status: 400 });
   }
+  if (category !== undefined && category !== null && !isEventCategory(category)) {
+    return NextResponse.json({ error: "category must be one of: work, family, errands." }, { status: 400 });
+  }
+  const resolvedCategory = isEventCategory(category) ? category : null;
+  const resolvedColor = resolvedCategory
+    ? getCategoryColor(resolvedCategory) ?? "#7c5cfc"
+    : typeof color === "string"
+    ? color
+    : "#7c5cfc";
   try {
     const event = await prisma.calendarEvent.create({
-      data: { title: title.trim(), date, time: time || "00:00", color: color ?? "#7c5cfc" },
+      data: {
+        title: title.trim(),
+        date,
+        time: time || "00:00",
+        color: resolvedColor,
+        category: resolvedCategory,
+        source: "local",
+      },
     });
     return NextResponse.json(event, { status: 201 });
   } catch (error) {

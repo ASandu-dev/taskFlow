@@ -53,6 +53,9 @@ export const ModelName = {
   Project: 'Project',
   Goal: 'Goal',
   CalendarEvent: 'CalendarEvent',
+  FamilyGroup: 'FamilyGroup',
+  FamilyGroupMember: 'FamilyGroupMember',
+  Integration: 'Integration',
   User: 'User'
 } as const
 
@@ -111,10 +114,57 @@ export const CalendarEventScalarFieldEnum = {
   title: 'title',
   date: 'date',
   time: 'time',
-  color: 'color'
+  color: 'color',
+  category: 'category',
+  source: 'source',
+  externalId: 'externalId',
+  familyGroupId: 'familyGroupId'
 } as const
 
 export type CalendarEventScalarFieldEnum = (typeof CalendarEventScalarFieldEnum)[keyof typeof CalendarEventScalarFieldEnum]
+
+
+export const FamilyGroupScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  description: 'description',
+  inviteCode: 'inviteCode',
+  adminId: 'adminId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type FamilyGroupScalarFieldEnum = (typeof FamilyGroupScalarFieldEnum)[keyof typeof FamilyGroupScalarFieldEnum]
+
+
+export const FamilyGroupMemberScalarFieldEnum = {
+  id: 'id',
+  groupId: 'groupId',
+  userId: 'userId',
+  joinedAt: 'joinedAt'
+} as const
+
+export type FamilyGroupMemberScalarFieldEnum = (typeof FamilyGroupMemberScalarFieldEnum)[keyof typeof FamilyGroupMemberScalarFieldEnum]
+
+
+export const IntegrationScalarFieldEnum = {
+  id: 'id',
+  provider: 'provider',
+  connected: 'connected',
+  accessToken: 'accessToken',
+  refreshToken: 'refreshToken',
+  tokenType: 'tokenType',
+  scope: 'scope',
+  expiresAt: 'expiresAt',
+  accountEmail: 'accountEmail',
+  calendarId: 'calendarId',
+  lastSyncedAt: 'lastSyncedAt',
+  lastSyncError: 'lastSyncError',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type IntegrationScalarFieldEnum = (typeof IntegrationScalarFieldEnum)[keyof typeof IntegrationScalarFieldEnum]
 
 
 export const UserScalarFieldEnum = {

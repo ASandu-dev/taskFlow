@@ -140,14 +140,18 @@ async function main() {
         title: "Team meeting",
         date: tomorrowStr,
         time: "10:00",
-        color: "#7c5cfc",
+        color: "#3b82f6",
+        category: "work",
+        source: "local",
       },
       {
         id: "2",
         title: "Doctor appointment",
         date: "2026-10-09",
         time: "15:00",
-        color: "#3b82f6",
+        color: "#22c55e",
+        category: "errands",
+        source: "local",
       },
       {
         id: "3",
@@ -155,6 +159,8 @@ async function main() {
         date: "2026-10-10",
         time: "18:00",
         color: "#ec4899",
+        category: "family",
+        source: "local",
       },
     ].map((event) =>
       prisma.calendarEvent.upsert({

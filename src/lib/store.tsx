@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useMemo } from "react";
+import { useUserSource } from "@/lib/user-bridge";
 import type { Task, Project, Goal, CalendarEvent, User } from "@/types";
 
 interface TaskContextType {
@@ -26,9 +27,34 @@ interface TaskContextType {
   addEvent: (event: Omit<CalendarEvent, "id">) => Promise<CalendarEvent>;
   updateEvent: (id: string, updates: Partial<Omit<CalendarEvent, "id">>) => Promise<CalendarEvent>;
   deleteEvent: (id: string) => Promise<void>;
+  /** Refetches tasks/projects/goals/events from the server (e.g. after joining a family group). */
+  refresh: () => void;
 }
 
 const TaskContext = createContext<TaskContextType | null>(null);
+
+const AVATAR_PALETTE = [
+  "linear-gradient(135deg, #7c5cfc 0%, #3b82f6 100%)",
+  "linear-gradient(135deg, #ec4899 0%, #f59e0b 100%)",
+  "linear-gradient(135deg, #22c55e 0%, #0ea5e9 100%)",
+  "linear-gradient(135deg, #f43f5e 0%, #f59e0b 100%)",
+  "linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)",
+];
+
+function colorFromString(value: string): string {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
+  return AVATAR_PALETTE[hash % AVATAR_PALETTE.length];
+}
+
+function initialsFromName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  return parts
+    .slice(0, 2)
+    .map((part) => part[0]!.toUpperCase())
+    .join("");
+}
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -58,30 +84,49 @@ export function TaskProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [user, setUser] = useState<User | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  // The signed-in user comes from Clerk when auth is configured (name, avatar
+  // image); with placeholder keys the store runs without a user instead.
+  const clerkUser = useUserSource();
+  const user: User | null = useMemo(() => {
+    const clerk = clerkUser.user;
+    if (!clerk) return null;
+    const name =
+      clerk.fullName?.trim() ||
+      clerk.firstName?.trim() ||
+      clerk.username?.trim() ||
+      clerk.primaryEmailAddress?.emailAddress ||
+      "TaskFlow user";
+    return {
+      name,
+      initials: initialsFromName(name),
+      avatarColor: colorFromString(clerk.id || name),
+      imageUrl: clerk.imageUrl || null,
+      plan: "Free Plan",
+    };
+  }, [clerkUser]);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       setError(null);
       try {
-        const [tasksData, projectsData, goalsData, eventsData, userData] = await Promise.all([
+        const [tasksData, projectsData, goalsData, eventsData] = await Promise.all([
           apiFetch<Task[]>("/api/tasks"),
           apiFetch<Project[]>("/api/projects"),
           apiFetch<Goal[]>("/api/goals"),
           apiFetch<CalendarEvent[]>("/api/events"),
-          apiFetch<User | null>("/api/user"),
         ]);
         if (cancelled) return;
         setTasks(tasksData);
         setProjects(projectsData);
         setGoals(goalsData);
         setEvents(eventsData);
-        setUser(userData);
         setLoadFailed(false);
       } catch (err) {
         if (!cancelled) {
@@ -94,13 +139,14 @@ export function TaskProvider({ children }: { children: ReactNode }) {
     }
     load();
     return () => { cancelled = true; };
-  }, [loadAttempt]);
+  }, [loadAttempt, refreshTick]);
 
   const clearError = useCallback(() => setError(null), []);
   const retryLoad = useCallback(() => {
     setHydrated(false);
     setLoadAttempt((attempt) => attempt + 1);
   }, []);
+  const refresh = useCallback(() => setRefreshTick((tick) => tick + 1), []);
 
   const runMutation = useCallback(async <T,>(operation: () => Promise<T>): Promise<T> => {
     setError(null);
@@ -281,6 +327,7 @@ export function TaskProvider({ children }: { children: ReactNode }) {
         addEvent,
         updateEvent,
         deleteEvent,
+        refresh,
       }}
     >
       {children}

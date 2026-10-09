@@ -38,6 +38,21 @@ export type Goal = Prisma.GoalModel
  */
 export type CalendarEvent = Prisma.CalendarEventModel
 /**
+ * Model FamilyGroup
+ * 
+ */
+export type FamilyGroup = Prisma.FamilyGroupModel
+/**
+ * Model FamilyGroupMember
+ * 
+ */
+export type FamilyGroupMember = Prisma.FamilyGroupMemberModel
+/**
+ * Model Integration
+ * 
+ */
+export type Integration = Prisma.IntegrationModel
+/**
  * Model User
  * 
  */

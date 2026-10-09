@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
@@ -15,11 +16,31 @@ import type { Project } from "@/types";
 const presetColors = ["#7c5cfc", "#22c55e", "#3b82f6", "#f59e0b", "#ec4899"];
 
 export default function ProjectsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ProjectsContent />
+    </Suspense>
+  );
+}
+
+function ProjectsContent() {
   const { projects, tasks, addProject, updateProject, deleteProject } = useTaskStore();
+  const searchParams = useSearchParams();
   const [showModal, setShowModal] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [name, setName] = useState("");
   const [color, setColor] = useState(presetColors[0]);
+
+  // The sidebar "Add project" button links here with ?new=1 to auto-open the
+  // create dialog. Clear the query once handled so back/refresh don't reopen it.
+  useEffect(() => {
+    if (searchParams.get("new") !== "1") return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setShowModal(true);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("new");
+    window.history.replaceState(null, "", url);
+  }, [searchParams]);
 
   const projectStats = useMemo(
     () => projects.map((p) => {

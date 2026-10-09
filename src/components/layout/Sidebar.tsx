@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -12,13 +12,13 @@ import {
   Target,
   Timer,
   FileText,
-  Settings,
   ChevronRight,
+  Users,
 } from "lucide-react";
 import { navItems } from "@/data/mock";
 import { useTaskStore } from "@/lib/store";
 import { ProjectBadge } from "@/components/ui/Badge";
-import { Avatar } from "@/components/ui/Avatar";
+import { UserMenu } from "@/components/layout/UserMenu";
 
 const iconMap = {
   LayoutDashboard,
@@ -29,8 +29,8 @@ const iconMap = {
   Target,
   Timer,
   FileText,
-  Settings,
   ChevronRight,
+  Users,
 } as const;
 
 interface SidebarProps {
@@ -38,8 +38,9 @@ interface SidebarProps {
 }
 
 export function Sidebar({ className }: SidebarProps) {
-  const { projects, user } = useTaskStore();
+  const { projects } = useTaskStore();
   const pathname = usePathname();
+  const router = useRouter();
   
   return (
     <aside
@@ -63,7 +64,7 @@ export function Sidebar({ className }: SidebarProps) {
           </Link>
         </div>
         
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto" aria-label="Primary navigation">
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto scrollbar-thin" aria-label="Primary navigation">
           {navItems.map((item) => {
             const Icon = iconMap[item.icon as keyof typeof iconMap];
             const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
@@ -89,11 +90,17 @@ export function Sidebar({ className }: SidebarProps) {
         <div className="p-4 border-t border-white/10 space-y-3">
           <div className="flex items-center justify-between px-3 py-1">
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Projects</h3>
-            <button className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors" aria-label="Add project">
+            <button
+              type="button"
+              onClick={() => router.push("/projects?new=1")}
+              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+              aria-label="Add project"
+              title="Add project"
+            >
               <ChevronRight className="h-4 w-4 rotate-90" aria-hidden="true" />
             </button>
           </div>
-          <div className="px-3 space-y-2 max-h-40 overflow-y-auto">
+          <div className="px-3 space-y-2 max-h-48 overflow-y-auto scrollbar-thin">
             {projects.map((project) => (
               <Link
                 key={project.id}
@@ -107,16 +114,7 @@ export function Sidebar({ className }: SidebarProps) {
         </div>
         
         <div className="p-4 border-t border-white/10">
-          <div className="flex items-center gap-3">
-            {user && <Avatar initials={user.initials} color={user.avatarColor} size="md" alt={user.name} />}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">{user?.name ?? "Profile unavailable"}</p>
-              <p className="text-xs text-slate-400 truncate">{user?.plan ?? ""}</p>
-            </div>
-            <button className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors" aria-label="Settings">
-              <Settings className="h-5 w-5" aria-hidden="true" />
-            </button>
-          </div>
+          <UserMenu showName tone="dark" avatarSize="md" />
         </div>
       </div>
     </aside>

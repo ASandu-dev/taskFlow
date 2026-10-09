@@ -14,6 +14,7 @@ import { useTaskStore } from "@/lib/store";
 import type { CalendarEvent } from "@/types";
 import { Plus, CalendarClock, Trash2 } from "lucide-react";
 import { getDateKey } from "@/lib/utils";
+import { EVENT_CATEGORIES, getCategory, isEventCategory, type EventCategory } from "@/lib/categories";
 
 export default function UpcomingPage() {
   const { events: upcomingEvents, addEvent, updateEvent, deleteEvent } = useTaskStore();
@@ -22,7 +23,7 @@ export default function UpcomingPage() {
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [title, setTitle] = useState("");
   const [time, setTime] = useState("");
-  const [color, setColor] = useState("#7c5cfc");
+  const [category, setCategory] = useState<EventCategory>("work");
 
   const eventsByDate = upcomingEvents.reduce<Record<string, CalendarEvent[]>>((acc, e) => {
     (acc[e.date] ||= []).push(e);
@@ -34,7 +35,7 @@ export default function UpcomingPage() {
     setTitle("");
     setSelectedDate((selected) => selected || getDateKey(new Date()));
     setTime("");
-    setColor("#7c5cfc");
+    setCategory("work");
     setShowModal(true);
   };
 
@@ -43,14 +44,20 @@ export default function UpcomingPage() {
     setTitle(event.title);
     setSelectedDate(event.date);
     setTime(event.time);
-    setColor(event.color);
+    setCategory(isEventCategory(event.category) ? event.category : "work");
     setShowModal(true);
   };
 
   const saveEvent = async () => {
     if (!title.trim() || !selectedDate) return;
     try {
-      const event = { title: title.trim(), date: selectedDate, time: time || "00:00", color };
+      const event = {
+        title: title.trim(),
+        date: selectedDate,
+        time: time || "00:00",
+        color: getCategory(category)?.color ?? "#7c5cfc",
+        category,
+      };
       if (editingEvent) await updateEvent(editingEvent.id, event);
       else await addEvent(event);
       setShowModal(false);
@@ -86,6 +93,7 @@ export default function UpcomingPage() {
                   events={upcomingEvents}
                   onClick={openEdit}
                   emptyMessage="No upcoming events"
+                  hidePast
                 />
               </CardContent>
             </Card>
@@ -118,13 +126,28 @@ export default function UpcomingPage() {
             <Input label="Date" type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} required />
             <Input label="Time" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Color</label>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Category</label>
               <div className="flex items-center gap-2 flex-wrap">
-                {["#7c5cfc", "#3b82f6", "#22c55e", "#f59e0b", "#ec4899"].map((c) => (
-                  <button key={c} type="button" onClick={() => setColor(c)}
-                    className={cn("h-9 w-9 rounded-xl border-2 transition-all", color === c ? "border-purple-500 scale-110" : "border-transparent hover:border-slate-300")}
-                    style={{ backgroundColor: c } as React.CSSProperties}
-                    aria-label={`Select ${c} color`} aria-pressed={color === c} />
+                {EVENT_CATEGORIES.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setCategory(option.id)}
+                    className={cn(
+                      "inline-flex items-center gap-2 rounded-xl border-2 px-3 py-2 text-sm font-medium transition-all",
+                      category === option.id
+                        ? "border-purple-500 bg-purple-50 text-slate-900"
+                        : "border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                    )}
+                    aria-pressed={category === option.id}
+                  >
+                    <span
+                      className="h-3.5 w-3.5 rounded-full"
+                      style={{ backgroundColor: option.color }}
+                      aria-hidden="true"
+                    />
+                    {option.label}
+                  </button>
                 ))}
               </div>
             </div>

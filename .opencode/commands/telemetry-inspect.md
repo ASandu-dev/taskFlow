@@ -6,5 +6,5 @@ argument-hint: <session_id|latest>
 Run this command with the argument and display the output verbatim. Do not interpret, summarize, or modify it.
 
 ```bash
-bun run "/home/andrei/.cache/kilo/packages/opencode-telemetry@latest/node_modules/opencode-telemetry/scripts/inspect.ts" "$ARGUMENTS" || node "/home/andrei/.cache/kilo/packages/opencode-telemetry@latest/node_modules/opencode-telemetry/scripts/inspect.js" "$ARGUMENTS"
+bun run "/home/andrei/.cache/opencode/packages/opencode-telemetry@latest/node_modules/opencode-telemetry/scripts/inspect.ts" "$ARGUMENTS" || node "/home/andrei/.cache/opencode/packages/opencode-telemetry@latest/node_modules/opencode-telemetry/scripts/inspect.js" "$ARGUMENTS"
 ```

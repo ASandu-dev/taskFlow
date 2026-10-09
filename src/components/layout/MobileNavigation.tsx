@@ -15,14 +15,12 @@ import {
   CalendarClock,
   Target,
   FileText,
-  Settings,
+  Users,
   LayoutDashboard,
 } from "lucide-react";
 import { mobileNavItems, navItems } from "@/data/mock";
-import { useTaskStore } from "@/lib/store";
-import { Avatar } from "@/components/ui/Avatar";
 import { Modal } from "@/components/ui/Modal";
-import { Button } from "@/components/ui/Button";
+import { UserMenu } from "@/components/layout/UserMenu";
 
 const bottomIconMap = {
   Home,
@@ -41,11 +39,10 @@ const moreIconMap = {
   Target,
   Timer,
   FileText,
-  Settings,
+  Users,
 } as const;
 
 export function MobileNavigation() {
-  const { user } = useTaskStore();
   const pathname = usePathname();
   const [showMore, setShowMore] = useState(false);
   
@@ -148,16 +145,7 @@ export function MobileNavigation() {
             );
           })}
           <div className="pt-4 border-t border-slate-200/60">
-            <div className="flex items-center gap-3 px-3 py-2">
-              {user && <Avatar initials={user.initials} color={user.avatarColor} size="sm" alt={user.name} />}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-900 truncate">{user?.name ?? "Profile unavailable"}</p>
-                <p className="text-xs text-slate-500 truncate">{user?.plan ?? ""}</p>
-              </div>
-              <Button variant="ghost" size="icon" className="text-slate-400 hover:text-slate-600" aria-label="Settings">
-                <Settings className="h-5 w-5" aria-hidden="true" />
-              </Button>
-            </div>
+            <UserMenu showName onNavigate={() => setShowMore(false)} />
           </div>
         </div>
       </Modal>

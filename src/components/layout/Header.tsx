@@ -7,8 +7,8 @@ import { Search, Bell, CheckSquare } from "lucide-react";
 import { getGreeting } from "@/lib/utils";
 import { useTaskStore } from "@/lib/store";
 import { Input } from "@/components/ui/Input";
-import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
+import { UserMenu } from "@/components/layout/UserMenu";
 
 interface HeaderProps {
   onSearch?: (value: string) => void;
@@ -80,7 +80,7 @@ export function Header({ onSearch, searchValue, className }: HeaderProps) {
                 <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-pink-500" aria-hidden="true" />
               </Button>
 
-              {user && <Avatar initials={user.initials} color={user.avatarColor} size="sm" alt={user.name} />}
+              <UserMenu avatarSize="sm" />
             </div>
           </div>
         </div>
@@ -90,7 +90,6 @@ export function Header({ onSearch, searchValue, className }: HeaderProps) {
 }
 
 export function MobileHeader() {
-  const { user } = useTaskStore();
   return (
     <header className="lg:hidden sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200/60">
       <div className="px-4 py-3 flex items-center justify-between">
@@ -105,7 +104,7 @@ export function MobileHeader() {
             <Bell className="h-5 w-5" aria-hidden="true" />
             <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-pink-500" aria-hidden="true" />
           </Button>
-          {user && <Avatar initials={user.initials} color={user.avatarColor} size="sm" alt={user.name} />}
+          <UserMenu avatarSize="sm" />
         </div>
       </div>
     </header>

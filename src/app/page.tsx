@@ -407,6 +407,7 @@ export default function DashboardPage() {
                 events={upcomingEvents}
                 onClick={handleUpcomingClick}
                 emptyMessage="No upcoming events"
+                hidePast
               />
             </CardContent>
           </Card>

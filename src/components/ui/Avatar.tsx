@@ -15,17 +15,31 @@ interface AvatarProps {
   size?: AvatarSize;
   className?: string;
   alt?: string;
+  imageUrl?: string | null;
 }
 
-export function Avatar({ initials, color, size = "md", className, alt }: AvatarProps) {
+export function Avatar({ initials, color, size = "md", className, alt, imageUrl }: AvatarProps) {
+  const shared = cn(
+    "inline-flex items-center justify-center rounded-full font-semibold text-white",
+    "shadow-sm",
+    avatarSizes[size],
+    className
+  );
+  if (imageUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={imageUrl}
+        alt={alt || `Avatar for ${initials}`}
+        className={cn(shared, "object-cover")}
+        role="img"
+        aria-label={alt || `Avatar for ${initials}`}
+      />
+    );
+  }
   return (
     <div
-      className={cn(
-        "inline-flex items-center justify-center rounded-full font-semibold text-white",
-        "shadow-sm",
-        avatarSizes[size],
-        className
-      )}
+      className={shared}
       style={{ background: color } as React.CSSProperties}
       role="img"
       aria-label={alt || `Avatar for ${initials}`}

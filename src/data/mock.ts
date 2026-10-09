@@ -17,6 +17,7 @@ export const navItems: readonly NavItem[] = [
   { label: "Goals", href: "/goals", icon: "Target" },
   { label: "Focus Mode", href: "/focus", icon: "Timer" },
   { label: "Templates", href: "/templates", icon: "FileText" },
+  { label: "Family", href: "/family", icon: "Users" },
 ];
 
 export const mobileNavItems: readonly MobileNavItem[] = [

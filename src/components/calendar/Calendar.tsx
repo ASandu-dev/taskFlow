@@ -44,11 +44,6 @@ export function Calendar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // mount-only: sync time-of-day and current month after first render
 
-  const hasEvent = (date: Date) => {
-    const key = getDateKey(date);
-    return (eventsByDate[key]?.length || 0) > 0;
-  };
-
   const isCurrentMonth = (date: Date) => date.getMonth() === currentMonth.getMonth();
 
   const handlePrevMonth = () => {
@@ -133,7 +128,8 @@ export function Calendar({
           const isSelected = dateKey === selectedDate;
           const isTodayDate = dateKey === today;
           const isOtherMonth = !isCurrentMonth(day);
-          const dayHasEvent = hasEvent(day);
+          const dayEvents = eventsByDate[dateKey] ?? [];
+          const dayHasEvent = dayEvents.length > 0;
           
           return (
             <button
@@ -149,9 +145,7 @@ export function Calendar({
                   : isTodayDate
                   ? "ring-2 ring-purple-500 bg-purple-50 text-slate-900"
                   : "text-slate-600 hover:bg-slate-50",
-                isOtherMonth && "text-slate-300 hover:bg-transparent",
-                dayHasEvent && !isSelected && "after:content-[''] after:absolute after:bottom-1 after:h-1.5 after:w-1.5 after:rounded-full after:bg-purple-500",
-                isSelected && dayHasEvent && "after:content-[''] after:absolute after:bottom-1 after:h-1.5 after:w-1.5 after:rounded-full after:bg-white"
+                isOtherMonth && "text-slate-300 hover:bg-transparent"
               )}
               role="gridcell"
               aria-selected={isSelected}
@@ -161,6 +155,17 @@ export function Calendar({
               tabIndex={isSelected ? 0 : -1}
             >
               <span className="relative z-10 font-medium">{day.getDate()}</span>
+              {dayHasEvent && (
+                <span className="relative z-10 mt-0.5 flex items-center gap-0.5" aria-hidden="true">
+                  {dayEvents.slice(0, 3).map((event, eventIndex) => (
+                    <span
+                      key={`${event.id}-${eventIndex}`}
+                      className="h-1.5 w-1.5 rounded-full"
+                      style={{ backgroundColor: isSelected ? "#ffffff" : event.color }}
+                    />
+                  ))}
+                </span>
+              )}
             </button>
           );
         })}

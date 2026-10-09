@@ -97,6 +97,7 @@ export default function CalendarPage() {
                     events={upcomingEvents}
                     onClick={(e) => setSelectedDate(e.date)}
                     emptyMessage="No upcoming events"
+                    hidePast
                   />
                 )}
               </CardContent>

@@ -41,11 +41,61 @@ model Goal {
 }
 
 model CalendarEvent {
-  id    String @id @default(cuid())
-  title String
-  date  String
-  time  String
-  color String
+  id            String        @id @default(cuid())
+  title         String
+  date          String
+  time          String
+  color         String
+  category      String?
+  source        String        @default("local")
+  externalId    String?       @unique
+  familyGroupId String?
+  familyGroup   FamilyGroup?  @relation(fields: [familyGroupId], references: [id], onDelete: Cascade)
+
+  @@index([source])
+  @@index([familyGroupId])
+}
+
+model FamilyGroup {
+  id          String               @id @default(cuid())
+  name        String
+  description String?
+  inviteCode  String               @unique
+  adminId     String // Clerk user id of the group creator (admin)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  members     FamilyGroupMember[]
+  events      CalendarEvent[]
+
+  @@index([adminId])
+}
+
+model FamilyGroupMember {
+  id       String      @id @default(cuid())
+  groupId  String
+  userId   String // Clerk user id
+  joinedAt DateTime    @default(now())
+  group    FamilyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([userId])
+}
+
+model Integration {
+  id            String    @id @default(cuid())
+  provider      String    @unique
+  connected     Boolean   @default(false)
+  accessToken   String?
+  refreshToken  String?
+  tokenType     String?
+  scope         String?
+  expiresAt     DateTime?
+  accountEmail  String?
+  calendarId    String    @default("primary")
+  lastSyncedAt  DateTime?
+  lastSyncError String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
 model User {

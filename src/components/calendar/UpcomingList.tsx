@@ -9,6 +9,8 @@ interface UpcomingListProps {
   onClick?: (event: CalendarEvent) => void;
   className?: string;
   emptyMessage?: string;
+  /** Omit events dated before today (true for "Upcoming" views). */
+  hidePast?: boolean;
 }
 
 function getRelativeLabel(dateStr: string, todayKey: string | null): string {
@@ -31,7 +33,7 @@ function getRelativeLabel(dateStr: string, todayKey: string | null): string {
   return formatDate(dateStr, { weekday: "short", month: "short", day: "numeric" });
 }
 
-export function UpcomingList({ events, onClick, className, emptyMessage = "No upcoming events" }: UpcomingListProps) {
+export function UpcomingList({ events, onClick, className, emptyMessage = "No upcoming events", hidePast = false }: UpcomingListProps) {
   // SSR-safe: `new Date()` is unstable during prerender, so resolve the
   // today-key after mount and fall back to the formatted date during SSR.
   const [todayKey, setTodayKey] = useState<string | null>(null);
@@ -40,7 +42,9 @@ export function UpcomingList({ events, onClick, className, emptyMessage = "No up
     setTodayKey(getDateKey(new Date()));
   }, []);
 
-  if (events.length === 0) {
+  const visibleEvents = hidePast && todayKey ? events.filter((event) => event.date >= todayKey) : events;
+
+  if (visibleEvents.length === 0) {
     return (
       <div className={cn("py-8 text-center", className)}>
         <Calendar className="h-12 w-12 text-slate-300 mx-auto mb-3" aria-hidden="true" />
@@ -51,7 +55,7 @@ export function UpcomingList({ events, onClick, className, emptyMessage = "No up
 
   return (
     <div className={cn("space-y-2", className)} role="list" aria-label="Upcoming events">
-      {events.map((event) => (
+      {visibleEvents.map((event) => (
         <button
           key={event.id}
           onClick={() => onClick?.(event)}

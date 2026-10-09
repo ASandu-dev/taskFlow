@@ -35,6 +35,40 @@ Requirements: Node.js 22+, npm, and a PostgreSQL instance.
 
 Open [http://localhost:3000](http://localhost:3000).
 
+## Google Calendar Integration
+
+TaskFlow can import events from Google Calendar. Events are pulled into the TaskFlow
+calendar on demand from **Settings → Integrations**. Imported events are tagged with a
+calendar category (Work, Family, or Errands), and disconnecting removes them again.
+
+1. In the [Google Cloud Console](https://console.cloud.google.com/), enable the
+   **Google Calendar API** and create an OAuth 2.0 Client ID of type **Web application**.
+2. Add an authorized redirect URI that matches where you run the app, for example
+   `http://localhost:3000/api/integrations/google/callback`.
+3. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env`. Optionally set
+   `GOOGLE_REDIRECT_URI` when the redirect URI differs from the request origin.
+4. Restart the app, open **Settings → Integrations**, and click **Connect**. Use
+   **Sync now** to import events (the last 30 days through the next 12 months).
+
+The connection and its OAuth tokens are stored in the `Integration` table.
+
+## Authentication & Family Groups
+
+Sign-in uses [Clerk](https://clerk.com) with **Google OAuth**. Once authenticated you
+can create **family groups**, join them with a 6-character **invite code**, and share
+events that appear on every member's calendar.
+
+1. Create an application in the [Clerk dashboard](https://dashboard.clerk.com).
+2. Under **User & Authentication → Social Connections**, enable **Google**.
+3. Copy `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` into `.env`
+   (replacing the placeholder values in `.env.example`).
+4. Rebuild the app container: `docker compose up -d --build app`.
+
+All pages and `/api/*` routes (except `/sign-in`, `/sign-up`, `/api/health`, and the
+Google callback) require a signed-in user. Family groups and membership are stored in
+the `FamilyGroup` and `FamilyGroupMember` tables; shared events carry a
+`familyGroupId` and are merged into the event list of their members.
+
 ## Docker
 
 Docker Compose runs the production Next.js server, PostgreSQL, and a one-shot migration/seed container:
@@ -47,7 +81,7 @@ docker compose logs -f app
 
 The app becomes available after PostgreSQL is healthy and the initializer has completed. It listens on `0.0.0.0:3000` inside the container. PostgreSQL is only reachable on the private Compose network and is not published to the host.
 
-The Compose password default is for local development only. Before using the stack on a network accessible to others, set a strong `POSTGRES_PASSWORD` in an untracked `.env` file and configure suitable access controls; this app does not currently provide user authentication.
+The Compose password default is for local development only. Before using the stack on a network accessible to others, set a strong `POSTGRES_PASSWORD` in an untracked `.env` file and configure suitable access controls. PostgreSQL is not published outside the Compose network.
 
 ## Port Configuration
 
