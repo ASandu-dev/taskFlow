@@ -22,7 +22,17 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* Use the Inter variable injected by next/font (layout.tsx) instead of the
+     browser default, which was previously hard-coded to Arial. */
+  font-family: var(--font-inter), Arial, Helvetica, sans-serif;
+}
+
+/* Safety net so every interactive element has a visible focus indicator even
+   when a component forgets to define one. Components that intentionally use a
+   ring still win because their outline-none utility is more specific. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid #7c5cfc;
+  outline-offset: 2px;
 }
 
 /* Thin, unobtrusive scrollbars for dense panels (sidebar nav, project list). */

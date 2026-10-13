@@ -25,8 +25,10 @@ export function ProductivityChart({ data, labels, className, maxValue }: Product
   const max = maxValue || Math.max(...data, 1);
 
   return (
-    <div className={cn("space-y-4", className)} role="img" aria-label="Productivity chart">
+    <div className={cn("space-y-4", className)}>
       <div className="relative h-48" style={{ maxHeight: "200px" }}>
+        {/* No role="img" wrapper: that would collapse the chart into a single
+            leaf node and hide the per-day values from assistive tech. */}
         <div className="absolute inset-0 flex items-end justify-between px-1" role="list" aria-label="Daily tasks completed">
           {data.map((value, index) => {
             const height = (value / max) * 100;
@@ -34,8 +36,9 @@ export function ProductivityChart({ data, labels, className, maxValue }: Product
             return (
               <div
                 key={index}
-                className="relative flex-1 flex flex-col items-center justify-end px-1 min-w-0"
+                className="group relative flex-1 flex flex-col items-center justify-end px-1 min-w-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-inset"
                 role="listitem"
+                tabIndex={0}
                 aria-label={`${label}: ${value} tasks`}
               >
                 <div
@@ -48,10 +51,7 @@ export function ProductivityChart({ data, labels, className, maxValue }: Product
                   )}
                   style={{ height: `${height}%` } as React.CSSProperties}
                 >
-                  <div
-                    className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded bg-slate-900 text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap"
-                    style={{ transform: "translateX(-50%) translateY(4px)" } as React.CSSProperties}
-                  >
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded bg-slate-900 text-white text-xs font-medium opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100 whitespace-nowrap">
                     {value}
                   </div>
                 </div>

@@ -6,6 +6,7 @@ import type { Task, Priority } from "@/types";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
+import { useFamilyMembers } from "./family-members";
 
 interface TaskModalProps {
   open: boolean;
@@ -24,6 +25,8 @@ function getInitialValues(initialTask?: Task | null, defaultDate = "", projectId
       priority: initialTask.priority,
       time: initialTask.time || "",
       date: initialTask.date || defaultDate,
+      assigneeId: initialTask.assigneeId ?? "",
+      recurring: initialTask.recurring ?? false,
     };
   }
   return {
@@ -32,6 +35,8 @@ function getInitialValues(initialTask?: Task | null, defaultDate = "", projectId
     priority: "medium" as Priority,
     time: "",
     date: defaultDate,
+    assigneeId: "",
+    recurring: false,
   };
 }
 
@@ -42,10 +47,31 @@ export function TaskModal({ open, onClose, onSubmit, initialTask, loading, defau
   const [priority, setPriority] = useState<Priority>("medium");
   const [time, setTime] = useState("");
   const [date, setDate] = useState("");
+  const [assigneeId, setAssigneeId] = useState("");
+  const [recurring, setRecurring] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const prevOpenRef = useRef(open);
   const prevInitialTaskRef = useRef(initialTask);
+
+  const selectedProject = projects.find((project) => project.id === projectId) ?? null;
+  const familyGroupId = selectedProject?.familyGroupId ?? null;
+  const members = useFamilyMembers(familyGroupId);
+
+  // Family projects can be assigned to any member; personal projects only to
+  // their owner. An existing value that is not in the loaded list stays
+  // selectable so editing never silently drops it.
+  const assigneeOptions: Array<{ value: string; label: string }> = [{ value: "", label: "Unassigned" }];
+  if (familyGroupId) {
+    for (const member of members ?? []) {
+      assigneeOptions.push({ value: member.userId, label: member.isYou ? `Me (${member.name})` : member.name });
+    }
+  } else if (selectedProject?.ownerId) {
+    assigneeOptions.push({ value: selectedProject.ownerId, label: "Me" });
+  }
+  if (assigneeId && !assigneeOptions.some((option) => option.value === assigneeId)) {
+    assigneeOptions.push({ value: assigneeId, label: "Assigned member" });
+  }
 
   // Reset form when modal opens or initialTask changes
   useEffect(() => {
@@ -56,6 +82,8 @@ export function TaskModal({ open, onClose, onSubmit, initialTask, loading, defau
       setPriority(values.priority);
       setTime(values.time);
       setDate(values.date);
+      setAssigneeId(values.assigneeId);
+      setRecurring(values.recurring);
       setError("");
     }
     prevOpenRef.current = open;
@@ -86,6 +114,8 @@ export function TaskModal({ open, onClose, onSubmit, initialTask, loading, defau
         status: initialTask?.status ?? "todo",
         time: time || null,
         date: date || null,
+        assigneeId: assigneeId || null,
+        recurring,
       });
       onClose();
     } catch (submitError) {
@@ -121,7 +151,11 @@ export function TaskModal({ open, onClose, onSubmit, initialTask, loading, defau
           <select
             id="project"
             value={projectId}
-            onChange={(e) => setProjectId(e.target.value)}
+            onChange={(e) => {
+              setProjectId(e.target.value);
+              // Assignments are project-scoped, so switching projects clears it.
+              setAssigneeId("");
+            }}
             disabled={projects.length === 0}
             className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 hover:border-slate-300 transition-colors"
           >
@@ -147,7 +181,7 @@ export function TaskModal({ open, onClose, onSubmit, initialTask, loading, defau
           </select>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input
             label="Time"
             type="time"
@@ -161,6 +195,40 @@ export function TaskModal({ open, onClose, onSubmit, initialTask, loading, defau
             value={date}
             onChange={(e) => setDate(e.target.value)}
             id="date"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="assignee" className="block text-sm font-medium text-slate-700 mb-1.5">
+            Assign to
+          </label>
+          <select
+            id="assignee"
+            value={assigneeId}
+            onChange={(e) => setAssigneeId(e.target.value)}
+            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 hover:border-slate-300 transition-colors"
+          >
+            {assigneeOptions.map((option) => (
+              <option key={option.value || "unassigned"} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 px-4 py-3">
+          <div>
+            <label htmlFor="recurring" className="text-sm font-medium text-slate-700">
+              Repeats daily
+            </label>
+            <p className="mt-0.5 text-xs text-slate-500">Completion is tracked for each day.</p>
+          </div>
+          <input
+            id="recurring"
+            type="checkbox"
+            checked={recurring}
+            onChange={(e) => setRecurring(e.target.checked)}
+            className="h-5 w-5 shrink-0 cursor-pointer rounded accent-purple-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
           />
         </div>
 

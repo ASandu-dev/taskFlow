@@ -20,28 +20,59 @@ export interface GoogleOAuthConfig {
   clientSecret?: string;
   redirectUri: string;
   configured: boolean;
+  /**
+   * True when Google credentials are present but the production redirect URI is
+   * missing. The integration stays disabled and the UI surfaces a configuration
+   * error instead of guessing a redirect target.
+   */
+  misconfigured?: boolean;
 }
 
-export function getGoogleOAuthConfig(origin: string): GoogleOAuthConfig {
+export function getGoogleOAuthConfig(origin: string | null): GoogleOAuthConfig {
   const clientId = process.env.GOOGLE_CLIENT_ID?.trim() || undefined;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim() || undefined;
+  const configuredRedirectUri = process.env.GOOGLE_REDIRECT_URI?.trim() || undefined;
+  const hasCredentials = Boolean(clientId && clientSecret);
+
+  // GOOGLE_REDIRECT_URI is REQUIRED in production and must be the canonical
+  // https origin. Without it we must never derive a redirect URI from the
+  // (untrusted) request Host / X-Forwarded-Host, so the integration is reported
+  // as not configured and the callers fail closed.
+  if (!configuredRedirectUri && process.env.NODE_ENV === "production") {
+    return {
+      clientId,
+      clientSecret,
+      redirectUri: "",
+      configured: false,
+      misconfigured: hasCredentials,
+    };
+  }
+
   const redirectUri =
-    process.env.GOOGLE_REDIRECT_URI?.trim() || `${origin}/api/integrations/google/callback`;
-  return { clientId, clientSecret, redirectUri, configured: Boolean(clientId && clientSecret) };
+    configuredRedirectUri ??
+    (origin ? `${origin}/api/integrations/google/callback` : "");
+  return { clientId, clientSecret, redirectUri, configured: Boolean(hasCredentials && redirectUri) };
 }
 
-// Behind a TLS-terminating reverse proxy the request origin may report an
-// internal host or `http:`. When GOOGLE_REDIRECT_URI is configured its origin is
-// the canonical public one, so it is used for post-auth redirects.
-export function getAppOrigin(requestUrl: URL): string {
+/**
+ * Resolves the trusted public app origin for post-auth redirects.
+ *
+ * GOOGLE_REDIRECT_URI is REQUIRED in production and must be the canonical https
+ * origin (e.g. `https://app.example.com`); its origin is trusted. When it is
+ * absent or malformed in production this returns null so callers fail closed
+ * rather than building a redirect target from the attacker-controllable request
+ * Host / X-Forwarded-Host. Development keeps the request-origin convenience.
+ */
+export function getAppOrigin(requestUrl: URL): string | null {
   const configured = process.env.GOOGLE_REDIRECT_URI?.trim();
   if (configured) {
     try {
       return new URL(configured).origin;
     } catch {
-      // Malformed env value; fall back to the request origin.
+      // Malformed env value: fall through to the fail-closed path.
     }
   }
+  if (process.env.NODE_ENV === "production") return null;
   return requestUrl.origin;
 }
 
@@ -55,6 +86,37 @@ export function isHttpsDeployment(): boolean {
     }
   }
   return process.env.NODE_ENV === "production";
+}
+
+/**
+ * OAuth `state` is bound to the initiating user. The value is stored in an
+ * httpOnly, SameSite=Lax cookie; the callback only accepts it when the state
+ * round-trips AND the current session user matches the bound user. This blocks
+ * CSRF and account-linking abuse (an attacker cannot complete their own OAuth
+ * flow inside a victim's session).
+ */
+export interface GoogleOAuthState {
+  readonly state: string;
+  readonly userId: string;
+}
+
+export function serializeGoogleOAuthState(value: GoogleOAuthState): string {
+  return JSON.stringify(value);
+}
+
+/** Parses the state cookie defensively; returns null for malformed values. */
+export function parseGoogleOAuthState(raw: string | undefined | null): GoogleOAuthState | null {
+  if (!raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    const { state, userId } = parsed as { state?: unknown; userId?: unknown };
+    if (typeof state !== "string" || state.length === 0) return null;
+    if (typeof userId !== "string" || userId.length === 0) return null;
+    return { state, userId };
+  } catch {
+    return null;
+  }
 }
 
 export interface GoogleTokenResponse {
@@ -235,9 +297,27 @@ export interface MappedCalendarEvent {
   category: EventCategory;
   source: "google";
   externalId: string;
+  /** Synced Google events are personal: owned by the syncing user. */
+  ownerId: string;
+  familyGroupId: null;
+  // Personal events must never default to the shared `family` classification;
+  // synced events are treated as work availability, gated by the owner's
+  // shareWorkAvailability preference.
+  visibility: "work";
 }
 
-export function mapGoogleEventToCalendarEvent(event: GoogleCalendarEvent): MappedCalendarEvent | null {
+/**
+ * Maps a Google event to a personal CalendarEvent for `ownerId`.
+ *
+ * `externalId` is namespaced with the owner id because `CalendarEvent.externalId`
+ * is globally unique while Google event ids can legitimately repeat across users
+ * (shared calendars, invited events). Namespacing preserves the global unique
+ * constraint AND guarantees a user can only ever upsert/reconcile their own rows.
+ */
+export function mapGoogleEventToCalendarEvent(
+  event: GoogleCalendarEvent,
+  ownerId: string
+): MappedCalendarEvent | null {
   const title = event.summary?.trim();
   const date = event.start?.date;
   const dateTime = event.start?.dateTime;
@@ -265,7 +345,10 @@ export function mapGoogleEventToCalendarEvent(event: GoogleCalendarEvent): Mappe
     color: getCategoryColor(category) ?? "#7c5cfc",
     category,
     source: "google",
-    externalId: event.id,
+    externalId: `${ownerId}:${event.id}`,
+    ownerId,
+    familyGroupId: null,
+    visibility: "work",
   };
 }
 

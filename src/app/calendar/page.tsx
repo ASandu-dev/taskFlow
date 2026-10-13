@@ -8,16 +8,33 @@ import { Calendar as CalendarComp } from "@/components/calendar/Calendar";
 import { UpcomingList } from "@/components/calendar/UpcomingList";
 import { TaskList } from "@/components/tasks/TaskList";
 import { useTaskStore } from "@/lib/store";
-import type { CalendarEvent } from "@/types";
-import { getPriorityColor } from "@/lib/utils";
+import type { CalendarEntry } from "@/types";
+import { cn, getPriorityColor } from "@/lib/utils";
 import { getTasksForDate } from "@/lib/utils";
+
+/** Client-side calendar filter. Never affects what the backend returns. */
+type CalendarFilter = "all" | "family" | "work";
+
+const FILTERS: readonly { id: CalendarFilter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "family", label: "Family" },
+  { id: "work", label: "Work" },
+];
 
 export default function CalendarPage() {
   const { tasks, toggleTask, deleteTask, events: upcomingEvents } = useTaskStore();
   const [selectedDate, setSelectedDate] = useState<string>("");
+  const [filter, setFilter] = useState<CalendarFilter>("all");
 
-  const eventsByDate = useMemo<Record<string, CalendarEvent[]>>(() => {
-    const map: Record<string, CalendarEvent[]> = {};
+  // Filtering happens entirely in the browser; the store always holds the full
+  // server response (including other members' work blocks).
+  const filteredEvents = useMemo(() => {
+    if (filter === "all") return upcomingEvents;
+    return upcomingEvents.filter((event) => event.visibility === filter);
+  }, [upcomingEvents, filter]);
+
+  const eventsByDate = useMemo<Record<string, CalendarEntry[]>>(() => {
+    const map: Record<string, CalendarEntry[]> = {};
     tasks.forEach((t) => {
       if (t.date) {
         (map[t.date] ||= []).push({
@@ -26,14 +43,15 @@ export default function CalendarPage() {
           date: t.date,
           time: t.time || "00:00",
           color: getPriorityColor(t.priority),
+          visibility: "private",
         });
       }
     });
-    upcomingEvents.forEach((event) => {
+    filteredEvents.forEach((event) => {
       (map[event.date] ||= []).push(event);
     });
     return map;
-  }, [tasks, upcomingEvents]);
+  }, [tasks, filteredEvents]);
 
   const selectedTasks = useMemo(
     () => selectedDate ? getTasksForDate(tasks, selectedDate) : [],
@@ -48,6 +66,30 @@ export default function CalendarPage() {
         title="Calendar"
         description="View your schedule, tasks, and events by day."
       >
+        <div
+          className="flex flex-wrap items-center gap-2"
+          role="group"
+          aria-label="Filter events"
+        >
+          {FILTERS.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => setFilter(option.id)}
+              aria-pressed={filter === option.id}
+              className={cn(
+                "inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-medium transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2",
+                filter === option.id
+                  ? "border-purple-300 bg-purple-50 text-purple-800"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-purple-200 hover:bg-purple-50/40"
+              )}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <Card>
@@ -83,9 +125,10 @@ export default function CalendarPage() {
                     {selectedTasks.length > 0 ? (
                       <TaskList
                         tasks={selectedTasks}
-                        onToggle={toggleTask}
-                        onEdit={() => {}}
-                        onDelete={deleteTask}
+                        onToggle={(id) => { void toggleTask(id).catch(() => {}); }}
+                        onDelete={(id) => {
+                          if (confirm("Delete this task?")) void deleteTask(id).catch(() => {});
+                        }}
                         emptyMessage="No tasks"
                       />
                     ) : selectedEvents.length === 0 ? (
@@ -94,7 +137,7 @@ export default function CalendarPage() {
                   </div>
                 ) : (
                   <UpcomingList
-                    events={upcomingEvents}
+                    events={filteredEvents}
                     onClick={(e) => setSelectedDate(e.date)}
                     emptyMessage="No upcoming events"
                     hidePast

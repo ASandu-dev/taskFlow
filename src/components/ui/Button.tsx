@@ -22,7 +22,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       sm: "px-3 py-1.5 text-sm rounded-xl gap-1.5",
       md: "px-4 py-2 text-sm rounded-xl gap-2",
       lg: "px-6 py-3 text-base rounded-xl gap-2",
-      icon: "p-2 rounded-xl",
+      // Icon-only buttons must meet the 44px minimum touch target (WCAG 2.5.5).
+      icon: "p-2.5 min-h-11 min-w-11 rounded-xl",
     };
 
     return (

@@ -1,19 +1,22 @@
 import { connection, NextResponse } from "next/server";
+import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { apiError, readJsonBody } from "@/lib/api-response";
-import { requireUserId } from "@/lib/auth";
-
-function unauthorized() {
-  return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-}
+import { authErrorResponse, requireAuthenticatedUserId } from "@/lib/authorization";
 
 const INVITE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
+/**
+ * Generates a 6-character invite code with a CSPRNG. The code is retained for
+ * display/back-compat only — joining now goes through hashed invitations, so
+ * this value is never accepted as a join credential.
+ */
 async function generateUniqueInviteCode(): Promise<string> {
   for (let attempt = 0; attempt < 10; attempt += 1) {
+    const bytes = randomBytes(6);
     let code = "";
     for (let i = 0; i < 6; i += 1) {
-      code += INVITE_ALPHABET[Math.floor(Math.random() * INVITE_ALPHABET.length)];
+      code += INVITE_ALPHABET[bytes[i]! % INVITE_ALPHABET.length];
     }
     const existing = await prisma.familyGroup.findUnique({
       where: { inviteCode: code },
@@ -21,15 +24,16 @@ async function generateUniqueInviteCode(): Promise<string> {
     });
     if (!existing) return code;
   }
-  return `FAM${Math.floor(Math.random() * 90000) + 10000}`;
+  // Astronomically unlikely; fall back to a longer random code that still fits
+  // the unique column.
+  return `FAM${randomBytes(8).toString("hex").toUpperCase()}`;
 }
 
 /** Groups the signed-in user belongs to, with their role and member count. */
 export async function GET() {
   await connection();
-  const userId = await requireUserId();
-  if (!userId) return unauthorized();
   try {
+    const userId = await requireAuthenticatedUserId();
     const memberships = await prisma.familyGroupMember.findMany({
       where: { userId },
       include: {
@@ -45,23 +49,21 @@ export async function GET() {
       description: membership.group.description,
       inviteCode: membership.group.inviteCode,
       adminId: membership.group.adminId,
-      isAdmin: membership.group.adminId === userId,
+      role: membership.role,
+      isAdmin: membership.role === "owner" || membership.role === "admin",
       createdAt: membership.group.createdAt,
       memberCount: membership.group._count.members,
       joinedAt: membership.joinedAt,
     }));
     return NextResponse.json(groups);
   } catch (error) {
-    return apiError(error, "Listing family groups", "Unable to load family groups.");
+    return authErrorResponse(error) ?? apiError(error, "Listing family groups", "Unable to load family groups.");
   }
 }
 
-/** Create a family group. The creator becomes its admin and first member. */
+/** Create a family group. The creator becomes its owner and first member. */
 export async function POST(req: Request) {
   await connection();
-  const userId = await requireUserId();
-  if (!userId) return unauthorized();
-
   const parsed = await readJsonBody(req);
   if ("response" in parsed) return parsed.response;
   const { name, description } = parsed.body;
@@ -79,21 +81,33 @@ export async function POST(req: Request) {
   }
 
   try {
+    const userId = await requireAuthenticatedUserId();
     const inviteCode = await generateUniqueInviteCode();
+    // Nested create keeps group creation and the owner membership atomic.
     const group = await prisma.familyGroup.create({
       data: {
         name: name.trim(),
         description: description?.trim() || null,
         inviteCode,
         adminId: userId,
+        members: { create: { userId, role: "owner" } },
       },
     });
-    await prisma.familyGroupMember.create({ data: { groupId: group.id, userId } });
     return NextResponse.json(
-      { id: group.id, name: group.name, description: group.description, inviteCode: group.inviteCode, adminId: group.adminId, isAdmin: true, createdAt: group.createdAt, memberCount: 1 },
+      {
+        id: group.id,
+        name: group.name,
+        description: group.description,
+        inviteCode: group.inviteCode,
+        adminId: group.adminId,
+        role: "owner",
+        isAdmin: true,
+        createdAt: group.createdAt,
+        memberCount: 1,
+      },
       { status: 201 }
     );
   } catch (error) {
-    return apiError(error, "Creating family group", "Unable to create the family group.");
+    return authErrorResponse(error) ?? apiError(error, "Creating family group", "Unable to create the family group.");
   }
 }

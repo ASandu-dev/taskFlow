@@ -52,7 +52,13 @@ export function Header({ onSearch, searchValue, className }: HeaderProps) {
         <div className="flex items-center justify-between gap-4">
           <div className="flex-1 max-w-xl">
             <p className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-              {greeting.text}{user ? `, ${user.name}` : ""} <span aria-hidden="true">{greeting.emoji}</span>
+              <span>{greeting.text}{user ? "," : ""}</span>
+              {user ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <span>{user.name}</span>
+                </span>
+              ) : null}
+              <span aria-hidden="true">{greeting.emoji}</span>
             </p>
             <p className="text-sm text-slate-500 mt-0.5">A little progress each day adds up to big results.</p>
           </div>
@@ -100,9 +106,9 @@ export function MobileHeader() {
           <span className="font-bold text-slate-900">TaskFlow</span>
         </Link>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="text-slate-400 hover:text-slate-600" aria-label="Notifications">
+          <Button variant="ghost" size="icon" className="relative text-slate-400 hover:text-slate-600" aria-label="Notifications">
             <Bell className="h-5 w-5" aria-hidden="true" />
-            <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-pink-500" aria-hidden="true" />
+            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-pink-500" aria-hidden="true" />
           </Button>
           <UserMenu avatarSize="sm" />
         </div>

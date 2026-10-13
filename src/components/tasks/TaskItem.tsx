@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { Check, Pencil, Trash2, Clock } from "lucide-react";
+import { Check, Pencil, Trash2, Clock, User, Repeat } from "lucide-react";
 import { formatTime } from "@/lib/utils";
 import type { Task } from "@/types";
 import { ProjectBadge } from "@/components/ui/Badge";
 import { PriorityBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { useTaskStore } from "@/lib/store";
+import { useFamilyMembers } from "./family-members";
 
 interface TaskItemProps {
   task: Task;
@@ -20,8 +20,19 @@ interface TaskItemProps {
 
 export function TaskItem({ task, onToggle, onEdit, onDelete, className }: TaskItemProps) {
   const { projects } = useTaskStore();
-  const [showActions, setShowActions] = useState(false);
   const project = projects.find((p) => p.id === task.projectId);
+
+  // Resolve a human label for the assignee. Family members are shared across
+  // items via the module cache; personal tasks are assigned to their owner.
+  const familyGroupId = project?.familyGroupId ?? null;
+  const members = useFamilyMembers(familyGroupId);
+  const assignee = task.assigneeId
+    ? members?.find((member) => member.userId === task.assigneeId) ??
+      (project && !familyGroupId && task.assigneeId === project.ownerId
+        ? { userId: task.assigneeId, name: "You", isYou: true }
+        : null)
+    : null;
+  const assigneeLabel = assignee ? (assignee.isYou ? "You" : assignee.name) : task.assigneeId ? "Assigned" : null;
   
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -39,8 +50,6 @@ export function TaskItem({ task, onToggle, onEdit, onDelete, className }: TaskIt
         task.status === "done" && "opacity-60",
         className
       )}
-      onMouseEnter={() => setShowActions(true)}
-      onMouseLeave={() => setShowActions(false)}
     >
       <button
         onClick={handleCheckboxClick}
@@ -63,7 +72,7 @@ export function TaskItem({ task, onToggle, onEdit, onDelete, className }: TaskIt
         <p
           className={cn(
             "text-sm font-medium truncate transition-colors",
-            task.status === "done" ? "text-slate-400 line-through" : "text-slate-900"
+            task.status === "done" ? "text-slate-500 line-through" : "text-slate-900"
           )}
         >
           {task.title}
@@ -72,15 +81,29 @@ export function TaskItem({ task, onToggle, onEdit, onDelete, className }: TaskIt
           {project && <ProjectBadge project={project} size="sm" />}
           <PriorityBadge priority={task.priority} />
           {task.time && (
-            <span className="flex items-center gap-1 text-xs text-slate-400">
+            <span className="flex items-center gap-1 text-xs text-slate-500">
               <Clock className="h-3.5 w-3.5" aria-hidden="true" />
               {formatTime(task.time)}
+            </span>
+          )}
+          {assigneeLabel && (
+            <span className="inline-flex max-w-40 items-center gap-1 rounded-full bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700">
+              <User className="h-3 w-3 shrink-0" aria-hidden="true" />
+              <span className="truncate">{assigneeLabel}</span>
+            </span>
+          )}
+          {task.recurring && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">
+              <Repeat className="h-3 w-3" aria-hidden="true" />
+              Daily
             </span>
           )}
         </div>
       </div>
       
-      <div className={cn("flex items-center gap-1 opacity-0 transition-opacity duration-200", showActions && "opacity-100")}>
+      {/* Always visible on touch/small screens; revealed on hover or keyboard
+          focus on larger screens so the controls are never invisible-but-focusable. */}
+      <div className="flex items-center gap-1 opacity-100 transition-opacity duration-200 lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100">
         {onEdit && (
           <Button
             variant="ghost"

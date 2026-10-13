@@ -9,6 +9,7 @@ import {
   Sun,
   CalendarClock,
   Calendar,
+  ListChecks,
   Target,
   Timer,
   FileText,
@@ -26,6 +27,7 @@ const iconMap = {
   Sun,
   CalendarClock,
   Calendar,
+  ListChecks,
   Target,
   Timer,
   FileText,
@@ -85,37 +87,37 @@ export function Sidebar({ className }: SidebarProps) {
               </Link>
             );
           })}
-        </nav>
-        
-        <div className="p-4 border-t border-white/10 space-y-3">
-          <div className="flex items-center justify-between px-3 py-1">
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Projects</h3>
-            <button
-              type="button"
-              onClick={() => router.push("/projects?new=1")}
-              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
-              aria-label="Add project"
-              title="Add project"
-            >
-              <ChevronRight className="h-4 w-4 rotate-90" aria-hidden="true" />
-            </button>
-          </div>
-          <div className="px-3 space-y-2 max-h-48 overflow-y-auto scrollbar-thin">
-            {projects.map((project) => (
-              <Link
-                key={project.id}
-                href="/projects"
-                className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-white/5 transition-colors"
+
+          <div className="mt-3 pt-3 border-t border-white/10 space-y-3">
+            <div className="flex items-center justify-between px-3 py-1">
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Projects</h3>
+              <button
+                type="button"
+                onClick={() => router.push("/projects")}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+                aria-label="View projects"
+                title="View projects"
               >
-                <ProjectBadge project={project} size="sm" />
-              </Link>
-            ))}
+                <ChevronRight className="h-4 w-4 rotate-90" aria-hidden="true" />
+              </button>
+            </div>
+            <div className="px-3 space-y-2 max-h-48 overflow-y-auto scrollbar-thin">
+              {projects.map((project) => (
+                <Link
+                  key={project.id}
+                  href="/projects"
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-white/5 transition-colors"
+                >
+                  <ProjectBadge project={project} size="sm" />
+                </Link>
+              ))}
+            </div>
           </div>
-        </div>
-        
-        <div className="p-4 border-t border-white/10">
-          <UserMenu showName tone="dark" avatarSize="md" />
-        </div>
+
+          <div className="mt-3 pt-3 border-t border-white/10">
+            <UserMenu showName tone="dark" avatarSize="md" />
+          </div>
+        </nav>
       </div>
     </aside>
   );

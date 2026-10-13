@@ -14,6 +14,11 @@ CMD ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed"]
 # Compile the Next.js production application.
 FROM deps AS builder
 COPY . .
+# NEXT_PUBLIC_* vars are inlined into the client bundle at build time, so the
+# publishable key must be available here (docker-compose passes it as a build
+# arg). The secret key stays runtime-only and is never baked into the image.
+ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 # Use webpack in the container; local development can continue using Turbopack.
 RUN NEXT_TURBOPACK=0 npm run build
 

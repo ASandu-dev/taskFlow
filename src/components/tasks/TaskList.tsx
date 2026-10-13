@@ -34,17 +34,18 @@ export function TaskList({
   }
 
   return (
-    <div className={cn("space-y-2", className)} role="list" aria-label="Task list">
+    <ul className={cn("space-y-2", className)} aria-label="Task list">
       {tasks.map((task) => (
-        <TaskItem
-          key={task.id}
-          task={task}
-          onToggle={onToggle}
-          onEdit={onEdit}
-          onDelete={onDelete}
-        />
+        <li key={task.id}>
+          <TaskItem
+            task={task}
+            onToggle={onToggle}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 

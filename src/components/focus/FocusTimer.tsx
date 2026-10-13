@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Play, Pause, RotateCcw, X, CheckCircle } from "lucide-react";
+import { Play, Pause, RotateCcw, CheckCircle } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 
@@ -91,20 +91,12 @@ export function FocusTimer({ open, onClose }: { open: boolean; onClose: () => vo
     <Modal
       open={open}
       onClose={handleClose}
-      title=""
+      title="Focus Mode"
+      description="A 25 minute focus session."
       size="xl"
       className="max-w-md"
     >
-      <div className="relative flex flex-col items-center justify-center min-h-[500px] px-6">
-        <button
-          onClick={handleClose}
-          className="absolute top-4 right-4 p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
-          aria-label="Close focus mode"
-          disabled={isComplete}
-        >
-          <X className="h-5 w-5" aria-hidden="true" />
-        </button>
-
+      <div className="relative flex flex-col items-center justify-center min-h-[420px] px-6">
         {!isComplete ? (
           <>
             <div className="relative w-48 h-48 mb-8">

@@ -1,8 +1,14 @@
 import { connection, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { apiError } from "@/lib/api-response";
-import { requireUserId } from "@/lib/auth";
+import { apiError, readJsonBody } from "@/lib/api-response";
+import {
+  authErrorResponse,
+  requireAuthenticatedUserId,
+  requireMembership,
+  requireRoleAtLeast,
+} from "@/lib/authorization";
 import { clerkClient } from "@clerk/nextjs/server";
+import type { Role } from "@/types";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -11,17 +17,13 @@ interface RouteContext {
 /** Group detail (members + shared events) for signed-in members only. */
 export async function GET(_req: Request, context: RouteContext) {
   await connection();
-  const userId = await requireUserId();
-  if (!userId) {
-    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-  }
-
   const { id } = await context.params;
   if (!id) {
     return NextResponse.json({ error: "Group id is required." }, { status: 400 });
   }
 
   try {
+    const userId = await requireAuthenticatedUserId();
     const group = await prisma.familyGroup.findUnique({
       where: { id },
       include: {
@@ -33,14 +35,18 @@ export async function GET(_req: Request, context: RouteContext) {
       return NextResponse.json({ error: "Family group not found." }, { status: 404 });
     }
 
-    const isMember = group.members.some((member) => member.userId === userId);
-    if (!isMember) {
-      return NextResponse.json({ error: "You are not a member of this family group." }, { status: 403 });
-    }
+    // Membership is verified server-side; non-members get a 403 with no data.
+    const membership = await requireMembership(userId, id);
 
     // Resolve member display names via Clerk when real keys are configured;
     // fall back to "You"/"Family member" labels otherwise (or on API errors).
-    let members: Array<{ userId: string; joinedAt: Date; name: string; isYou: boolean }>;
+    let members: Array<{
+      userId: string;
+      joinedAt: Date;
+      role: Role;
+      name: string;
+      isYou: boolean;
+    }>;
     try {
       const client = await clerkClient();
       const memberIds = group.members.map((member) => member.userId);
@@ -52,6 +58,7 @@ export async function GET(_req: Request, context: RouteContext) {
         return {
           userId: member.userId,
           joinedAt: member.joinedAt,
+          role: member.role,
           name: clerkUser?.fullName || email || "Family member",
           isYou: member.userId === userId,
         };
@@ -60,6 +67,7 @@ export async function GET(_req: Request, context: RouteContext) {
       members = group.members.map((member) => ({
         userId: member.userId,
         joinedAt: member.joinedAt,
+        role: member.role,
         name: member.userId === userId ? "You" : "Family member",
         isYou: member.userId === userId,
       }));
@@ -71,12 +79,70 @@ export async function GET(_req: Request, context: RouteContext) {
       description: group.description,
       inviteCode: group.inviteCode,
       adminId: group.adminId,
-      isAdmin: group.adminId === userId,
+      role: membership.role,
+      isAdmin: membership.role === "owner" || membership.role === "admin",
       createdAt: group.createdAt,
       members,
       events: group.events,
     });
   } catch (error) {
-    return apiError(error, "Loading family group", "Unable to load the family group.");
+    return authErrorResponse(error) ?? apiError(error, "Loading family group", "Unable to load the family group.");
+  }
+}
+
+/**
+ * Rename or re-describe a family group. Owner/admin only. Name stays a required
+ * non-empty value when supplied; description may be cleared with an explicit
+ * null (or an empty string, which is normalized to null).
+ */
+export async function PATCH(req: Request, context: RouteContext) {
+  await connection();
+  const { id } = await context.params;
+  if (!id) {
+    return NextResponse.json({ error: "Group id is required." }, { status: 400 });
+  }
+
+  const parsed = await readJsonBody(req);
+  if ("response" in parsed) return parsed.response;
+  const { name, description } = parsed.body;
+
+  if (name === undefined && description === undefined) {
+    return NextResponse.json({ error: "Provide a name or description to update." }, { status: 400 });
+  }
+  if (name !== undefined) {
+    if (typeof name !== "string" || !name.trim()) {
+      return NextResponse.json({ error: "name must not be empty." }, { status: 400 });
+    }
+    if (name.trim().length > 60) {
+      return NextResponse.json({ error: "name must be 60 characters or fewer." }, { status: 400 });
+    }
+  }
+  if (description !== undefined && description !== null) {
+    if (typeof description !== "string") {
+      return NextResponse.json({ error: "description must be a string or null." }, { status: 400 });
+    }
+    if (description.length > 200) {
+      return NextResponse.json({ error: "description must be 200 characters or fewer." }, { status: 400 });
+    }
+  }
+
+  try {
+    const userId = await requireAuthenticatedUserId();
+    await requireRoleAtLeast(userId, id, "admin");
+
+    const group = await prisma.familyGroup.update({
+      where: { id },
+      data: {
+        ...(name !== undefined ? { name: name.trim() } : {}),
+        ...(description !== undefined
+          ? { description: typeof description === "string" ? description.trim() || null : null }
+          : {}),
+      },
+      select: { id: true, name: true, description: true },
+    });
+
+    return NextResponse.json(group);
+  } catch (error) {
+    return authErrorResponse(error) ?? apiError(error, "Updating family group", "Unable to update the family group.");
   }
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { apiError, readJsonBody } from "@/lib/api-response";
+import { authErrorResponse, requireAuthenticatedUserId, requireProjectAccess } from "@/lib/authorization";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -21,6 +22,10 @@ export async function PATCH(req: Request, { params }: RouteContext) {
   }
 
   try {
+    const userId = await requireAuthenticatedUserId();
+    await requireProjectAccess(userId, id, "write");
+    // Scope columns are immutable here: a project cannot be moved between
+    // tenants through an update.
     const project = await prisma.project.update({
       where: { id },
       data: {
@@ -30,13 +35,16 @@ export async function PATCH(req: Request, { params }: RouteContext) {
     });
     return NextResponse.json(project);
   } catch (error) {
-    return apiError(error, "Updating project", "Unable to update project.");
+    return authErrorResponse(error) ?? apiError(error, "Updating project", "Unable to update project.");
   }
 }
 
 export async function DELETE(_req: Request, { params }: RouteContext) {
   const { id } = await params;
   try {
+    const userId = await requireAuthenticatedUserId();
+    // Deleting a family project requires the owner or admin role.
+    await requireProjectAccess(userId, id, "delete");
     const taskCount = await prisma.task.count({ where: { projectId: id } });
     if (taskCount > 0) {
       return NextResponse.json(
@@ -47,6 +55,6 @@ export async function DELETE(_req: Request, { params }: RouteContext) {
     await prisma.project.delete({ where: { id } });
     return NextResponse.json({ ok: true });
   } catch (error) {
-    return apiError(error, "Deleting project", "Unable to delete project.");
+    return authErrorResponse(error) ?? apiError(error, "Deleting project", "Unable to delete project.");
   }
 }
