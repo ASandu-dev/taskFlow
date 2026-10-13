@@ -44,7 +44,10 @@ export function UserMenu({ showName = false, tone = "light", avatarSize = "sm", 
       setOpen(false);
     }
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
     }
     document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
@@ -53,6 +56,13 @@ export function UserMenu({ showName = false, tone = "light", avatarSize = "sm", 
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [open]);
+
+  // Move focus into the panel when it opens so keyboard users land on the
+  // first action instead of the (portal) end of the document.
+  useEffect(() => {
+    if (!open || !position) return;
+    menuRef.current?.querySelector<HTMLElement>("a[href], button:not([disabled])")?.focus();
+  }, [open, position]);
 
   function toggle() {
     if (open) {
@@ -82,21 +92,22 @@ export function UserMenu({ showName = false, tone = "light", avatarSize = "sm", 
         ref={triggerRef}
         type="button"
         onClick={toggle}
-        aria-haspopup="menu"
         aria-expanded={open}
+        aria-controls="user-menu"
         aria-label={showName ? undefined : `Open menu for ${user.name}`}
         className={cn(
           "flex items-center gap-3 rounded-xl text-left transition-colors",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2",
           showName
             ? cn(
                 "w-full px-2 py-1.5",
                 tone === "dark" ? "hover:bg-white/5" : "hover:bg-slate-100"
               )
-            : "shrink-0 rounded-full hover:opacity-80",
+            : "min-h-11 min-w-11 shrink-0 justify-center rounded-full hover:opacity-80",
           className
         )}
       >
-        <Avatar initials={user.initials} color={user.avatarColor} size={avatarSize} alt={user.name} imageUrl={user.imageUrl} />
+        <Avatar initials={user.initials} color={user.avatarColor} size={avatarSize} alt={user.name} imageUrl={user.imageUrl} emoji={user.avatarEmoji ?? undefined} />
         {showName && (
           <>
             <span className="flex-1 min-w-0">
@@ -123,13 +134,12 @@ export function UserMenu({ showName = false, tone = "light", avatarSize = "sm", 
         createPortal(
           <div
             ref={menuRef}
-            role="menu"
-            aria-label="User menu"
+            id="user-menu"
             style={{ top: position.top, left: position.left, width: 240 }}
             className="fixed z-[70] rounded-xl border border-slate-200 bg-white shadow-lg shadow-slate-900/10 animate-fade-in overflow-hidden"
           >
             <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100">
-              <Avatar initials={user.initials} color={user.avatarColor} size="sm" alt={user.name} imageUrl={user.imageUrl} />
+              <Avatar initials={user.initials} color={user.avatarColor} size="sm" alt={user.name} imageUrl={user.imageUrl} emoji={user.avatarEmoji ?? undefined} />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-slate-900 truncate">{user.name}</p>
                 <p className="text-xs text-slate-500 truncate">{user.plan}</p>
@@ -138,7 +148,6 @@ export function UserMenu({ showName = false, tone = "light", avatarSize = "sm", 
             <div className="p-1.5">
               <Link
                 href="/settings"
-                role="menuitem"
                 onClick={() => {
                   setOpen(false);
                   onNavigate?.();
@@ -173,7 +182,6 @@ function ClerkSignOutButton({ onSignedOut }: { onSignedOut: () => void }) {
   return (
     <button
       type="button"
-      role="menuitem"
       onClick={() => {
         onSignedOut();
         void signOut({ redirectUrl: "/" });

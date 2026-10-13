@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
@@ -10,6 +11,7 @@ import {
   Plus,
   ChevronDown,
   Folder,
+  ListChecks,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatCard } from "@/components/stats/StatCard";
@@ -30,7 +32,7 @@ import {
   getDateKey,
   getPriorityColor,
 } from "@/lib/utils";
-import type { Task, CalendarEvent, TimeRange } from "@/types";
+import type { Task, CalendarEvent, CalendarEntry, TimeRange } from "@/types";
 
 type SortOption = "time" | "priority" | "created";
 
@@ -99,7 +101,7 @@ export default function DashboardPage() {
 
   // Tasks and calendar events are both loaded from the database.
   const eventsByDate = useMemo(() => {
-    const map: Record<string, CalendarEvent[]> = {};
+    const map: Record<string, CalendarEntry[]> = {};
     tasks.forEach((task) => {
       if (task.date) {
         const key = task.date;
@@ -110,6 +112,7 @@ export default function DashboardPage() {
           date: task.date,
           time: task.time || "00:00",
           color: getPriorityColor(task.priority),
+          visibility: "private",
         });
       }
     });
@@ -344,13 +347,14 @@ export default function DashboardPage() {
                     {sortOptions.map((option) => (
                       <button
                         key={option.value}
+                        type="button"
                         onClick={() => {
                           setSortBy(option.value);
                           setShowSortMenu(false);
                         }}
                         className={cn(
                           "w-full px-3 py-2 text-left text-sm transition-colors",
-                          "focus-visible:outline-none focus-visible:bg-slate-50",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-purple-500",
                           sortBy === option.value
                             ? "bg-purple-50 text-purple-600 font-medium"
                             : "text-slate-700 hover:bg-slate-50"
@@ -364,6 +368,13 @@ export default function DashboardPage() {
                   </div>
                 )}
               </div>
+              <Link
+                href="/checklist"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-purple-300 hover:text-purple-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
+              >
+                <ListChecks className="h-4 w-4" aria-hidden="true" />
+                <span className="hidden sm:inline">Checklist</span>
+              </Link>
               <Button onClick={handleAddTask} size="sm">
                 <Plus className="h-4 w-4" aria-hidden="true" />
                 <span className="hidden sm:inline">Add task</span>
@@ -440,6 +451,7 @@ export default function DashboardPage() {
 
       {/* Floating Action Button - Mobile */}
       <button
+        type="button"
         className="fixed bottom-20 right-4 lg:hidden z-40 h-14 w-14 rounded-full bg-gradient-to-br from-purple-500 to-violet-600 text-white shadow-lg shadow-purple-500/30 flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
         onClick={handleAddTask}
         aria-label="Add task"
@@ -478,15 +490,18 @@ export default function DashboardPage() {
             autoFocus
           />
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Color</label>
-            <div className="flex items-center gap-2 flex-wrap">
+            <p id="project-color-label" className="mb-2 block text-sm font-medium text-slate-700">
+              Color
+            </p>
+            <div className="flex items-center gap-2 flex-wrap" role="group" aria-labelledby="project-color-label">
               {presetColors.map((color) => (
                 <button
                   key={color}
                   type="button"
                   onClick={() => setNewProjectColor(color)}
                   className={cn(
-                    "h-10 w-10 rounded-xl border-2 transition-all",
+                    "h-11 w-11 rounded-xl border-2 transition-all",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2",
                     newProjectColor === color
                       ? "border-purple-500 scale-110 shadow-md"
                       : "border-transparent hover:border-slate-300"

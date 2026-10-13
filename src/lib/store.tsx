@@ -2,13 +2,15 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useMemo } from "react";
 import { useUserSource } from "@/lib/user-bridge";
-import type { Task, Project, Goal, CalendarEvent, User } from "@/types";
+import { getAvatarPreset, isAvatarPreset } from "@/lib/avatars";
+import { getDateKey } from "@/lib/utils";
+import type { Task, Project, Goal, CalendarEvent, CalendarEntry, User } from "@/types";
 
 interface TaskContextType {
   tasks: Task[];
   projects: Project[];
   goals: Goal[];
-  events: CalendarEvent[];
+  events: CalendarEntry[];
   user: User | null;
   hydrated: boolean;
   error: string | null;
@@ -18,6 +20,10 @@ interface TaskContextType {
   updateTask: (id: string, updates: Partial<Task>) => Promise<Task>;
   deleteTask: (id: string) => Promise<void>;
   toggleTask: (id: string) => Promise<Task>;
+  /** Marks a task complete. Recurring tasks store a per-day TaskCompletion. */
+  completeTask: (id: string, date?: string) => Promise<Task>;
+  /** Reverts a completion. Recurring tasks remove the per-day TaskCompletion. */
+  uncompleteTask: (id: string, date?: string) => Promise<Task>;
   addProject: (project: Omit<Project, "id">) => Promise<Project>;
   updateProject: (id: string, updates: Partial<Omit<Project, "id">>) => Promise<Project>;
   deleteProject: (id: string) => Promise<void>;
@@ -83,7 +89,7 @@ export function TaskProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [events, setEvents] = useState<CalendarEntry[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -102,12 +108,20 @@ export function TaskProvider({ children }: { children: ReactNode }) {
       clerk.username?.trim() ||
       clerk.primaryEmailAddress?.emailAddress ||
       "TaskFlow user";
+    // The preset avatar lives in Clerk publicMetadata. Anything other than a
+    // known preset id is treated as unset so a stale or hand-edited value can
+    // never reach the UI as a broken avatar.
+    const rawPreset = clerk.publicMetadata?.avatarPreset;
+    const avatarPreset = isAvatarPreset(rawPreset) ? rawPreset : null;
+    const preset = getAvatarPreset(avatarPreset);
     return {
       name,
       initials: initialsFromName(name),
       avatarColor: colorFromString(clerk.id || name),
       imageUrl: clerk.imageUrl || null,
       plan: "Free Plan",
+      avatarPreset,
+      avatarEmoji: preset?.emoji ?? null,
     };
   }, [clerkUser]);
 
@@ -120,7 +134,9 @@ export function TaskProvider({ children }: { children: ReactNode }) {
           apiFetch<Task[]>("/api/tasks"),
           apiFetch<Project[]>("/api/projects"),
           apiFetch<Goal[]>("/api/goals"),
-          apiFetch<CalendarEvent[]>("/api/events"),
+          // The endpoint returns real events interspersed with sanitized work
+          // blocks; the union keeps the read-only blocks type-checked.
+          apiFetch<CalendarEntry[]>("/api/events"),
         ]);
         if (cancelled) return;
         setTasks(tasksData);
@@ -187,11 +203,42 @@ export function TaskProvider({ children }: { children: ReactNode }) {
     });
   }, [runMutation]);
 
+  const completeTask = useCallback(async (id: string, date?: string) => {
+    return runMutation(async () => {
+      const updated = await apiFetch<Task>(`/api/tasks/${id}/complete`, {
+        method: "POST",
+        body: JSON.stringify(date ? { date } : {}),
+      });
+      setTasks((prev) => prev.map((task) => (task.id === id ? updated : task)));
+      return updated;
+    });
+  }, [runMutation]);
+
+  const uncompleteTask = useCallback(async (id: string, date?: string) => {
+    return runMutation(async () => {
+      const updated = await apiFetch<Task>(`/api/tasks/${id}/complete`, {
+        method: "DELETE",
+        body: JSON.stringify(date ? { date } : {}),
+      });
+      setTasks((prev) => prev.map((task) => (task.id === id ? updated : task)));
+      return updated;
+    });
+  }, [runMutation]);
+
   const toggleTask = useCallback(async (id: string) => {
     const current = tasks.find((t) => t.id === id);
     if (!current) throw new Error("Task not found in the current view.");
+    if (current.recurring) {
+      // Recurring tasks track completion per day via TaskCompletion, so toggling
+      // must hit the complete/uncomplete endpoints with today's date instead of
+      // flipping the non-authoritative `status`. `completedOnDate` is only
+      // returned for date-scoped list queries, so an unfetched value defaults to
+      // "not yet completed today".
+      const today = getDateKey(new Date());
+      return current.completedOnDate ? uncompleteTask(id, today) : completeTask(id, today);
+    }
     return updateTask(id, { status: current.status === "todo" ? "done" : "todo" });
-  }, [tasks, updateTask]);
+  }, [tasks, updateTask, completeTask, uncompleteTask]);
 
   const addProject = useCallback(async (project: Omit<Project, "id">) => {
     return runMutation(async () => {
@@ -318,6 +365,8 @@ export function TaskProvider({ children }: { children: ReactNode }) {
         updateTask,
         deleteTask,
         toggleTask,
+        completeTask,
+        uncompleteTask,
         addProject,
         updateProject,
         deleteProject,

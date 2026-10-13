@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
+import { cn, getDateKey } from "@/lib/utils";
 import {
   Home,
   Calendar,
@@ -13,6 +13,7 @@ import {
   CheckSquare,
   Sun,
   CalendarClock,
+  ListChecks,
   Target,
   FileText,
   Users,
@@ -20,12 +21,15 @@ import {
 } from "lucide-react";
 import { mobileNavItems, navItems } from "@/data/mock";
 import { Modal } from "@/components/ui/Modal";
+import { TaskModal } from "@/components/tasks/TaskModal";
 import { UserMenu } from "@/components/layout/UserMenu";
+import { useTaskStore } from "@/lib/store";
 
 const bottomIconMap = {
   Home,
   Calendar,
   Plus,
+  ListChecks,
   Timer,
   MoreHorizontal,
 } as const;
@@ -36,6 +40,7 @@ const moreIconMap = {
   Sun,
   CalendarClock,
   Calendar,
+  ListChecks,
   Target,
   Timer,
   FileText,
@@ -44,11 +49,22 @@ const moreIconMap = {
 
 export function MobileNavigation() {
   const pathname = usePathname();
+  const { addTask } = useTaskStore();
   const [showMore, setShowMore] = useState(false);
-  
-  const moreItems = navItems.filter((item) => 
-    !["Overview", "Calendar", "Focus Mode"].includes(item.label)
+  const [addOpen, setAddOpen] = useState(false);
+
+  const moreItems = navItems.filter((item) =>
+    !["Overview", "Calendar", "Focus Mode", "Checklist"].includes(item.label)
   );
+
+  // The bottom bar only has room for six destinations; the items not shown
+  // there live behind "More" instead of linking to a route that does not exist.
+  const navLinkClasses = (isActive: boolean) =>
+    cn(
+      "flex min-w-0 flex-col items-center gap-1 px-1 py-2.5",
+      "text-slate-500 transition-colors duration-200",
+      isActive ? "text-purple-600" : "hover:text-slate-700"
+    );
 
   return (
     <>
@@ -60,25 +76,38 @@ export function MobileNavigation() {
         )}
         aria-label="Mobile bottom navigation"
       >
-        <div className="grid grid-cols-5">
+        <div className="grid grid-cols-6">
           {mobileNavItems.map((item) => {
-            const Icon = bottomIconMap[item.icon as keyof typeof bottomIconMap];
-            const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
-            
+            // A native button opening the "More" sheet, rather than a link to a
+            // page that does not exist.
+            if (item.label === "More") {
+              return (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => setShowMore(true)}
+                  aria-haspopup="dialog"
+                  aria-expanded={showMore}
+                  className={navLinkClasses(false)}
+                >
+                  <MoreHorizontal className="h-6 w-6" aria-hidden="true" />
+                  <span className="w-full truncate text-center text-[10px] font-medium">{item.label}</span>
+                </button>
+              );
+            }
+
+            // The prominent centre action opens the task composer directly. It
+            // is a single button — nesting a button inside a link is invalid.
             if (item.prominent) {
               return (
-                <Link
+                <button
                   key={item.label}
-                  href={item.href}
-                  className={cn(
-                    "relative flex flex-col items-center justify-center gap-1 px-2 py-2.5",
-                    "text-slate-400",
-                    isActive && "text-purple-600"
-                  )}
-                  aria-current={isActive ? "page" : undefined}
-                  aria-label={item.label}
+                  type="button"
+                  onClick={() => setAddOpen(true)}
+                  aria-label="Add task"
+                  className="flex flex-col items-center justify-center gap-1 px-1 py-2.5 text-slate-400"
                 >
-                  <button
+                  <span
                     className={cn(
                       "relative z-10 flex h-12 w-12 items-center justify-center rounded-full",
                       "bg-gradient-to-br from-purple-500 to-violet-600 text-white",
@@ -87,29 +116,26 @@ export function MobileNavigation() {
                       "hover:scale-105 active:scale-95",
                       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
                     )}
-                    aria-label={item.label}
                   >
                     <Plus className="h-6 w-6" aria-hidden="true" />
-                  </button>
-                </Link>
+                  </span>
+                </button>
               );
             }
-            
+
+            const Icon = bottomIconMap[item.icon as keyof typeof bottomIconMap];
+            const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+
             return (
               <Link
                 key={item.label}
                 href={item.href}
-                className={cn(
-                  "flex flex-col items-center gap-1 px-2 py-2.5",
-                  "text-slate-400",
-                  "transition-colors duration-200",
-                  isActive ? "text-purple-600" : "hover:text-slate-600"
-                )}
+                className={navLinkClasses(isActive)}
                 aria-current={isActive ? "page" : undefined}
                 aria-label={item.label}
               >
                 <Icon className="h-6 w-6" aria-hidden="true" />
-                <span className="text-[10px] font-medium">{item.label}</span>
+                <span className="w-full truncate text-center text-[10px] font-medium">{item.label}</span>
               </Link>
             );
           })}
@@ -149,6 +175,18 @@ export function MobileNavigation() {
           </div>
         </div>
       </Modal>
+
+      {/* Only resolve the clock when the sheet is open; evaluating it during
+          the initial render would abort static prerendering (Next treats
+          `new Date()` as a request-time value). */}
+      <TaskModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onSubmit={async (data) => {
+          await addTask(data);
+        }}
+        defaultDate={addOpen ? getDateKey(new Date()) : undefined}
+      />
     </>
   );
 }

@@ -41,6 +41,17 @@ export default function GoalsPage() {
           </Button>
         }
       >
+        {goals.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 px-6 py-12 text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-purple-600 shadow-sm ring-1 ring-slate-200/70">
+              <Target className="h-7 w-7" aria-hidden="true" />
+            </div>
+            <p className="mt-3 text-base font-semibold text-slate-800">No goals yet</p>
+            <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500">
+              Set a target and track your progress over time.
+            </p>
+          </div>
+        ) : (
         <div className="grid gap-6 md:grid-cols-2">
           {goals.map((goal) => {
             const pct = Math.min(100, Math.round((goal.progress / goal.target) * 100));
@@ -55,12 +66,12 @@ export default function GoalsPage() {
                 <CardContent>
                   <div className="flex items-baseline justify-between mb-3">
                     <span className="text-3xl font-bold tabular-nums text-slate-900">
-                      {goal.progress}<span className="text-lg text-slate-400">/{goal.target}</span>
+                      {goal.progress}<span className="text-lg text-slate-500">/{goal.target}</span>
                     </span>
                     <span className="text-sm font-medium text-slate-500">{pct}%</span>
                   </div>
                   <Progress value={pct} color={goal.color} className="h-2.5" />
-                  <p className="text-xs text-slate-400 mt-2">
+                  <p className="text-xs text-slate-500 mt-2">
                     {goal.target - goal.progress > 0 ? `${goal.target - goal.progress} remaining` : "Goal reached 🎉"}
                   </p>
                   <div className="mt-4 flex justify-between">
@@ -90,6 +101,7 @@ export default function GoalsPage() {
             );
           })}
         </div>
+        )}
 
         <Modal open={showModal} onClose={() => setShowModal(false)} title="New Goal" description="Set a new target to work toward." size="sm">
           <div className="space-y-4">

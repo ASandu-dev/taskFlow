@@ -31,7 +31,10 @@ export function apiError(error: unknown, operation: string, message: string): Ne
     return NextResponse.json({ error: "A referenced record does not exist." }, { status: 400 });
   }
 
-  console.error(`${operation} failed`, error);
+  // Log only safe metadata: Prisma error objects can echo field values and
+  // messages may embed user input. Never log request bodies or tokens.
+  const name = error instanceof Error ? error.name : "UnknownError";
+  console.error(`${operation} failed: ${name}${code ? ` code=${code}` : ""}`);
   return NextResponse.json({ error: message }, { status: 500 });
 }
 

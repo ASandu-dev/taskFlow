@@ -1,10 +1,26 @@
 import { cn } from "@/lib/utils";
 
 const avatarSizes = {
-  sm: "h-8 w-8 text-xs",
-  md: "h-10 w-10 text-sm",
-  lg: "h-12 w-12 text-base",
-  xl: "h-16 w-16 text-lg",
+  sm: "h-8 w-8",
+  md: "h-10 w-10",
+  lg: "h-12 w-12",
+  xl: "h-16 w-16",
+} as const;
+
+// Initials need a smaller font than the circle suggests; emoji glyphs render
+// small relative to their font size, so they get a larger one per size.
+const initialsSizes = {
+  sm: "text-xs",
+  md: "text-sm",
+  lg: "text-base",
+  xl: "text-lg",
+} as const;
+
+const emojiSizes = {
+  sm: "text-sm",
+  md: "text-lg",
+  lg: "text-2xl",
+  xl: "text-3xl",
 } as const;
 
 type AvatarSize = keyof typeof avatarSizes;
@@ -16,9 +32,11 @@ interface AvatarProps {
   className?: string;
   alt?: string;
   imageUrl?: string | null;
+  /** Preset emoji rendered on the `color` background when no image is set. */
+  emoji?: string;
 }
 
-export function Avatar({ initials, color, size = "md", className, alt, imageUrl }: AvatarProps) {
+export function Avatar({ initials, color, size = "md", className, alt, imageUrl, emoji }: AvatarProps) {
   const shared = cn(
     "inline-flex items-center justify-center rounded-full font-semibold text-white",
     "shadow-sm",
@@ -39,12 +57,12 @@ export function Avatar({ initials, color, size = "md", className, alt, imageUrl 
   }
   return (
     <div
-      className={shared}
+      className={cn(shared, emoji ? emojiSizes[size] : initialsSizes[size])}
       style={{ background: color } as React.CSSProperties}
       role="img"
       aria-label={alt || `Avatar for ${initials}`}
     >
-      {initials}
+      {emoji || initials}
     </div>
   );
 }
@@ -75,7 +93,8 @@ export function AvatarGroup({ avatars, max = 4, size = "md", className }: Avatar
         <div
           className={cn(
             "inline-flex items-center justify-center rounded-full font-medium text-slate-600 bg-slate-100 ring-2 ring-white",
-            avatarSizes[size]
+            avatarSizes[size],
+            initialsSizes[size]
           )}
           aria-label={`${remaining} more`}
         >

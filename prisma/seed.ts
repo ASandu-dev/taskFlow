@@ -13,7 +13,41 @@ yesterday.setDate(yesterday.getDate() - 1);
 const twoDaysAgo = new Date(today);
 twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
 
+// The bundled demo dataset uses fixed ids ("1".."5") and has no tenant scope.
+// Once real (Clerk-synced) data or a family group exists, re-seeding would
+// create unscoped rows that must never leak across tenants, so bail out.
+async function hasRealData(): Promise<boolean> {
+  const [familyGroups, scopedProjects, scopedGoals, scopedEvents, realUsers] =
+    await Promise.all([
+      prisma.familyGroup.count(),
+      prisma.project.count({
+        where: { OR: [{ ownerId: { not: null } }, { familyGroupId: { not: null } }] },
+      }),
+      prisma.goal.count({
+        where: { OR: [{ ownerId: { not: null } }, { familyGroupId: { not: null } }] },
+      }),
+      prisma.calendarEvent.count({
+        where: { OR: [{ ownerId: { not: null } }, { familyGroupId: { not: null } }] },
+      }),
+      prisma.user.count({ where: { id: { not: "1" } } }),
+    ]);
+  return (
+    familyGroups > 0 ||
+    scopedProjects > 0 ||
+    scopedGoals > 0 ||
+    scopedEvents > 0 ||
+    realUsers > 0
+  );
+}
+
 async function main() {
+  // Demo rows are intentionally left with ownerId/familyGroupId null: no real
+  // family exists at seed time, and the backend filters unscoped rows out.
+  if (await hasRealData()) {
+    console.log("Seed skipped: existing application data detected.");
+    return;
+  }
+
   const projects = await Promise.all(
     [
       { id: "1", name: "Personal", color: "#22c55e" },

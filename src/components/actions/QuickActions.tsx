@@ -18,26 +18,26 @@ export function QuickActions({ actions, className }: QuickActionsProps) {
   return (
     <div
       className={cn(
-        "grid grid-cols-2 gap-3",
+        // Single column on the narrowest phones so labels never clip; two
+        // columns from 400px, four on large screens.
+        "grid grid-cols-1 gap-3 min-[400px]:grid-cols-2",
         "lg:grid-cols-4",
         className
       )}
-      role="list"
-      aria-label="Quick actions"
     >
       {actions.map((action, index) => (
         <button
           key={index}
+          type="button"
           onClick={action.onClick}
           className={cn(
-            "relative group flex flex-col items-start p-4 rounded-2xl",
+            "relative group flex min-h-11 min-w-0 w-full flex-col items-start p-4 rounded-2xl text-left",
             "bg-white border border-slate-200/60",
             "hover:border-slate-300 hover:shadow-md hover:-translate-y-1",
             "transition-all duration-300",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500",
             action.className
           )}
-          role="listitem"
         >
           <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center text-white mb-3 group-hover:scale-110 transition-transform">
             {action.icon}

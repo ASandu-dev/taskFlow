@@ -61,7 +61,9 @@ export default function TodayPage() {
               tasks={todayTasks}
               onToggle={(id) => { void toggleTask(id).catch(() => {}); }}
               onEdit={(task: Task) => { setEditingTask(task); setModalOpen(true); }}
-              onDelete={(id) => { void deleteTask(id).catch(() => {}); }}
+              onDelete={(id) => {
+                if (confirm("Delete this task?")) void deleteTask(id).catch(() => {});
+              }}
               emptyMessage="No tasks for today — enjoy your free day"
             />
           </CardContent>

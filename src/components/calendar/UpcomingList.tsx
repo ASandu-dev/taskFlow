@@ -1,11 +1,14 @@
+"use client";
+
 import { useState, useEffect } from "react";
-import { cn } from "@/lib/utils";
-import { Calendar, Clock } from "lucide-react";
-import { formatDate, getDateKey } from "@/lib/utils";
-import type { CalendarEvent } from "@/types";
+import { cn, formatDate, formatTime, formatWeekdayLong, getDateKey } from "@/lib/utils";
+import { Calendar, Clock, MapPin, Briefcase } from "lucide-react";
+import { isWorkBlock, entryColor } from "@/lib/calendar-entry";
+import type { CalendarEntry, CalendarEvent } from "@/types";
 
 interface UpcomingListProps {
-  events: CalendarEvent[];
+  events: CalendarEntry[];
+  /** Called only for real, editable events — never for read-only work blocks. */
   onClick?: (event: CalendarEvent) => void;
   className?: string;
   emptyMessage?: string;
@@ -28,7 +31,7 @@ function getRelativeLabel(dateStr: string, todayKey: string | null): string {
   if (diffDays === 1) return "Tomorrow";
   if (diffDays === -1) return "Yesterday";
   if (diffDays > 1 && diffDays <= 7) {
-    return eventDate.toLocaleDateString("en-US", { weekday: "long" });
+    return formatWeekdayLong(eventDate);
   }
   return formatDate(dateStr, { weekday: "short", month: "short", day: "numeric" });
 }
@@ -53,49 +56,91 @@ export function UpcomingList({ events, onClick, className, emptyMessage = "No up
     );
   }
 
+  const rowClasses =
+    "relative flex w-full items-center gap-3 rounded-xl border border-slate-200/60 bg-white p-3";
+
   return (
-    <div className={cn("space-y-2", className)} role="list" aria-label="Upcoming events">
-      {visibleEvents.map((event) => (
-        <button
-          key={event.id}
-          onClick={() => onClick?.(event)}
-          className={cn(
-            "w-full relative flex items-center gap-3 p-3 rounded-xl",
-            "bg-white border border-slate-200/60",
-            "hover:border-slate-300 hover:shadow-sm",
-            "transition-all duration-200",
-            onClick && "cursor-pointer"
-          )}
-          role="listitem"
-        >
-          <div
-            className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ backgroundColor: `${event.color}15`, color: event.color } as React.CSSProperties}
-            aria-hidden="true"
-          >
-            <Calendar className="h-5 w-5" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-slate-900 truncate">{event.title}</p>
-            <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
-              <span className="flex items-center gap-1">
-                <Clock className="h-3 w-3" aria-hidden="true" />
-                {event.time}
-              </span>
-              <span className="flex items-center gap-1 font-medium text-slate-600">
-                {getRelativeLabel(event.date, todayKey)}
-              </span>
+    <ul className={cn("space-y-2", className)} aria-label="Upcoming events">
+      {visibleEvents.map((entry) => {
+        const workBlock = isWorkBlock(entry);
+        const color = entryColor(entry);
+        const content = (
+          <>
+            <div
+              className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={
+                workBlock
+                  ? { backgroundColor: "#f1f5f9", color }
+                  : { backgroundColor: `${color}15`, color }
+              }
+              aria-hidden="true"
+            >
+              {workBlock ? <Briefcase className="h-5 w-5" /> : <Calendar className="h-5 w-5" />}
             </div>
-          </div>
-          {onClick && (
-            <div className="text-slate-300" aria-hidden="true">
-              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
+            <div className="flex-1 min-w-0">
+              <p
+                className={cn(
+                  "text-sm font-medium truncate",
+                  workBlock ? "text-slate-500" : "text-slate-900"
+                )}
+              >
+                {workBlock ? "Work" : entry.title}
+              </p>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-xs text-slate-500">
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" aria-hidden="true" />
+                  {entry.endTime ? `${formatTime(entry.time)} – ${formatTime(entry.endTime)}` : formatTime(entry.time)}
+                </span>
+                <span className="flex items-center gap-1 font-medium text-slate-600">
+                  {getRelativeLabel(entry.date, todayKey)}
+                </span>
+                {!workBlock && entry.location && (
+                  <span className="flex items-center gap-1 min-w-0">
+                    <MapPin className="h-3 w-3 shrink-0" aria-hidden="true" />
+                    <span className="truncate">{entry.location}</span>
+                  </span>
+                )}
+                {workBlock && (
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                    Busy
+                  </span>
+                )}
+              </div>
             </div>
-          )}
-        </button>
-      ))}
-    </div>
+            {!workBlock && onClick && (
+              <div className="text-slate-300" aria-hidden="true">
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </div>
+            )}
+          </>
+        );
+
+        return (
+          <li key={workBlock ? entry.key : entry.id} className="min-w-0">
+            {!workBlock && onClick ? (
+              // Only render a button when the row actually does something; a
+              // focusable button with no handler is a dead control. Work blocks
+              // are another member's private event, so they stay static.
+              <button
+                type="button"
+                onClick={() => onClick(entry)}
+                className={cn(
+                  rowClasses,
+                  "text-left transition-all duration-200",
+                  "hover:border-slate-300 hover:shadow-sm",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
+                )}
+              >
+                {content}
+              </button>
+            ) : (
+              <div className={cn(rowClasses, workBlock && "bg-slate-50/70 border-dashed")}>{content}</div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }

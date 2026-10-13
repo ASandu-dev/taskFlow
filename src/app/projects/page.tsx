@@ -97,6 +97,17 @@ function ProjectsContent() {
           </Button>
         }
       >
+        {projectStats.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 px-6 py-12 text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-purple-600 shadow-sm ring-1 ring-slate-200/70">
+              <Folder className="h-7 w-7" aria-hidden="true" />
+            </div>
+            <p className="mt-3 text-base font-semibold text-slate-800">No projects yet</p>
+            <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500">
+              Create a project to group related tasks together.
+            </p>
+          </div>
+        ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {projectStats.map(({ project, total, done }) => {
             const pct = total > 0 ? Math.round((done / total) * 100) : 0;
@@ -135,7 +146,7 @@ function ProjectsContent() {
                 <CardContent>
                   <div className="flex items-baseline justify-between mb-2">
                     <span className="text-2xl font-bold tabular-nums text-slate-900">
-                      {done}<span className="text-base text-slate-400">/{total}</span>
+                      {done}<span className="text-base text-slate-500">/{total}</span>
                     </span>
                     <span className="text-xs text-slate-500 font-medium">{pct}%</span>
                   </div>
@@ -159,6 +170,7 @@ function ProjectsContent() {
             );
           })}
         </div>
+        )}
 
         <Modal open={showModal} onClose={() => setShowModal(false)} title={editingProject ? "Edit Project" : "New Project"} description="Organize your tasks into projects." size="sm">
           <div className="space-y-4">
@@ -168,7 +180,11 @@ function ProjectsContent() {
               <div className="flex items-center gap-2 flex-wrap">
                 {presetColors.map((c) => (
                   <button key={c} type="button" onClick={() => setColor(c)}
-                    className={cn("h-9 w-9 rounded-xl border-2 transition-all", color === c ? "border-purple-500 scale-110" : "border-transparent hover:border-slate-300")}
+                    className={cn(
+                      "h-11 w-11 rounded-xl border-2 transition-all",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2",
+                      color === c ? "border-purple-500 scale-110" : "border-transparent hover:border-slate-300"
+                    )}
                     style={{ backgroundColor: c } as React.CSSProperties}
                     aria-label={`Select ${c} color`} aria-pressed={color === c} />
                 ))}

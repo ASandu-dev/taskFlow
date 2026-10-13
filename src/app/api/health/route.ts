@@ -12,7 +12,9 @@ export async function GET() {
       uptime: Math.floor(process.uptime()),
     });
   } catch (error) {
-    console.error("Health check database probe failed", error);
+    // Log only safe metadata; raw Prisma/pg errors can echo connection details.
+    const name = error instanceof Error ? error.name : "UnknownError";
+    console.error(`Health check database probe failed: ${name}`);
     return NextResponse.json({ status: "unavailable", database: "unavailable" }, { status: 503 });
   }
 }

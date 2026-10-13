@@ -14,6 +14,22 @@ export function formatDate(date: string | Date, options?: Intl.DateTimeFormatOpt
   });
 }
 
+/** Long, human date: "Monday, October 12, 2026". */
+export function formatDateLong(date: string | Date): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return d.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+}
+
+/** Month and year only: "October 2026". Used by the calendar header. */
+export function formatMonthYear(date: Date): string {
+  return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+}
+
+/** Weekday name only: "Monday". Used by relative event labels. */
+export function formatWeekdayLong(date: Date): string {
+  return date.toLocaleDateString("en-US", { weekday: "long" });
+}
+
 export function formatTime(time: string): string {
   const [hours, minutes] = time.split(":");
   const h = parseInt(hours, 10);

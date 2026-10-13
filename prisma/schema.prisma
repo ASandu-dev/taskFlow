@@ -10,70 +10,140 @@ datasource db {
 }
 
 model Task {
-  id        String   @id @default(cuid())
-  title     String
-  projectId String
-  priority  Priority
-  status    TaskStatus
-  time      String?
-  date      String?
-  createdAt DateTime @default(now())
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  id          String           @id @default(cuid())
+  title       String
+  projectId   String
+  priority    Priority
+  // For a recurring (daily template) task the per-day completion lives in
+  // TaskCompletion and this `status` is NOT authoritative. For non-recurring
+  // tasks `status` remains the source of truth.
+  status      TaskStatus
+  // Clerk user id of the family member this task is assigned to. null = unassigned.
+  assigneeId  String?
+  // true = a daily template task; completion is tracked per-day in TaskCompletion.
+  recurring   Boolean          @default(false)
+  // Clerk user id of the creator (audit metadata).
+  createdById String?
+  time        String?
+  date        String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  completions TaskCompletion[]
 
   @@index([projectId])
   @@index([date])
   @@index([status])
+  @@index([assigneeId])
+}
+
+// Per-day completion record for recurring (daily template) tasks. One row per
+// task per calendar day: the @@unique enforces single-use per day while history
+// is preserved across days. Not used for non-recurring tasks.
+model TaskCompletion {
+  id            String   @id @default(cuid())
+  taskId        String
+  // YYYY-MM-DD, the day the task was completed.
+  date          String
+  // Clerk user id of the family member who completed the task.
+  completedById String
+  completedAt   DateTime @default(now())
+  task          Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, date])
+  @@index([date])
+  @@index([completedById])
 }
 
 model Project {
-  id    String   @id @default(cuid())
-  name  String
-  color String
-  tasks Task[]
+  id            String       @id @default(cuid())
+  name          String
+  color         String
+  // Tenant scope: a family project sets familyGroupId; a personal project sets
+  // ownerId. At most one is expected to be non-null.
+  familyGroupId String?
+  ownerId       String?
+  familyGroup   FamilyGroup? @relation(fields: [familyGroupId], references: [id], onDelete: Cascade)
+  tasks         Task[]
+
+  @@index([familyGroupId])
+  @@index([ownerId])
 }
 
 model Goal {
-  id       String @id @default(cuid())
-  title    String
-  progress Int
-  target   Int
-  color    String
+  id            String       @id @default(cuid())
+  title         String
+  progress      Int
+  target        Int
+  color         String
+  // Tenant scope mirrors Project: familyGroupId for shared, ownerId for personal.
+  familyGroupId String?
+  ownerId       String?
+  familyGroup   FamilyGroup? @relation(fields: [familyGroupId], references: [id], onDelete: Cascade)
+
+  @@index([familyGroupId])
+  @@index([ownerId])
 }
 
 model CalendarEvent {
-  id            String        @id @default(cuid())
+  id            String          @id @default(cuid())
   title         String
+  // `date` (YYYY-MM-DD) and `time` (HH:MM) are local wall-clock values in
+  // `timezone`; when timezone is null the family's/local default applies.
   date          String
   time          String
+  // HH:MM; null = no explicit end.
+  endTime       String?
   color         String
   category      String?
-  source        String        @default("local")
-  externalId    String?       @unique
+  description   String?
+  location      String?
+  // IANA timezone name (e.g. "Europe/Bucharest"); null = family/local default.
+  timezone      String?
+  source        String          @default("local")
+  externalId    String?         @unique
+  // Clerk user id of the creator (audit metadata).
+  createdById   String?
+  // Personal event: familyGroupId null, ownerId set. Shared: familyGroupId set.
   familyGroupId String?
-  familyGroup   FamilyGroup?  @relation(fields: [familyGroupId], references: [id], onDelete: Cascade)
+  ownerId       String?
+  // Visibility classification: family (shared), work (personal, shown to family
+  // as a generic "Work" block), private (personal, never shared).
+  visibility    EventVisibility @default(family)
+  updatedAt     DateTime        @updatedAt
+  familyGroup   FamilyGroup?    @relation(fields: [familyGroupId], references: [id], onDelete: Cascade)
 
   @@index([source])
   @@index([familyGroupId])
+  @@index([ownerId])
+  @@index([visibility])
 }
 
 model FamilyGroup {
-  id          String               @id @default(cuid())
+  id          String              @id @default(cuid())
   name        String
   description String?
-  inviteCode  String               @unique
+  inviteCode  String              @unique
   adminId     String // Clerk user id of the group creator (admin)
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
   members     FamilyGroupMember[]
   events      CalendarEvent[]
+  projects    Project[]
+  goals       Goal[]
+  invitations FamilyInvitation[]
 
   @@index([adminId])
 }
 
+// Membership role hierarchy (highest to lowest): owner > admin > member > child.
+// `child` is the explicit child-profile role used by the daily checklist
+// (recurring Task + TaskCompletion) and carries the most restricted permissions.
 model FamilyGroupMember {
   id       String      @id @default(cuid())
   groupId  String
   userId   String // Clerk user id
+  role     Role        @default(member)
   joinedAt DateTime    @default(now())
   group    FamilyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
@@ -81,9 +151,36 @@ model FamilyGroupMember {
   @@index([userId])
 }
 
+// Invitations store only a SHA-256 hash of the token; the raw token exists
+// solely in the invite link handed to the invitee. Single-use is enforced by
+// usedAt being null at redemption time.
+model FamilyInvitation {
+  id            String      @id @default(cuid())
+  familyGroupId String
+  tokenHash     String      @unique
+  email         String?
+  role          Role        @default(member)
+  createdById   String // Clerk user id of the inviter
+  expiresAt     DateTime
+  usedAt        DateTime?
+  usedById      String?
+  // Set when an admin revokes the invitation; revoked invitations can never be redeemed.
+  revokedAt     DateTime?
+  createdAt     DateTime    @default(now())
+  familyGroup   FamilyGroup @relation(fields: [familyGroupId], references: [id], onDelete: Cascade)
+
+  @@index([familyGroupId])
+  @@index([email])
+  @@index([familyGroupId, email])
+}
+
+// Integration credentials are per-user: each row is owned by exactly one Clerk
+// user (userId), and a provider is unique only within that user's scope. A
+// provider's OAuth tokens must never be shared across users.
 model Integration {
   id            String    @id @default(cuid())
-  provider      String    @unique
+  userId        String
+  provider      String
   connected     Boolean   @default(false)
   accessToken   String?
   refreshToken  String?
@@ -96,6 +193,28 @@ model Integration {
   lastSyncError String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+
+  @@unique([provider, userId])
+  @@index([userId])
+}
+
+// Per-user persisted preferences. One row per Clerk user id.
+model UserSettings {
+  id                          String          @id @default(cuid())
+  userId                      String          @unique
+  // Default calendar view for the calendar page.
+  defaultCalendarView         CalendarView    @default(month)
+  // Whether family members may see this user's work events as generic "Work" blocks.
+  shareWorkAvailability       Boolean         @default(true)
+  // Default classification applied to newly created calendar events.
+  defaultEventClassification  EventVisibility @default(family)
+  // When true (and the user belongs to a family), Google Calendar sync imports
+  // events as family-shared events instead of personal work events.
+  shareSyncedEventsWithFamily Boolean         @default(false)
+  createdAt                   DateTime        @default(now())
+  updatedAt                   DateTime        @updatedAt
+
+  @@index([userId])
 }
 
 model User {
@@ -104,6 +223,13 @@ model User {
   plan        String
   avatarColor String
   initials    String
+}
+
+enum Role {
+  owner
+  admin
+  member
+  child
 }
 
 enum Priority {
@@ -115,4 +241,17 @@ enum Priority {
 enum TaskStatus {
   todo
   done
+}
+
+enum EventVisibility {
+  family
+  work
+  private
+}
+
+enum CalendarView {
+  month
+  week
+  day
+  agenda
 }

@@ -1,15 +1,24 @@
 import { auth } from "@clerk/nextjs/server";
-import { isClerkConfigured } from "@/lib/clerk-config";
+import { isClerkConfigured, isKeylessDevMode } from "@/lib/clerk-config";
 
 /**
  * Returns the signed-in user's Clerk id, or null when the request is not
- * authenticated. Route handlers should short-circuit with 401 when this is
- * null — the proxy already redirects browsers to /sign-in.
+ * authenticated.
+ *
+ * Fail-closed contract:
+ * - Clerk configured: the id from the verified session (or null).
+ * - Clerk NOT configured in production: always null. A misconfigured deployment
+ *   must never fabricate an identity or expose data.
+ * - Clerk NOT configured in development: the shared "anonymous" principal, so
+ *   local development keeps working without keys.
+ *
+ * Route handlers should short-circuit with 401 when this is null; `proxy.ts`
+ * already gates browsers and API routes.
  */
 export async function requireUserId(): Promise<string | null> {
-  // Without real Clerk keys the app runs without auth (see isClerkConfigured);
-  // treat the single anonymous user as "anonymous" so personal data still loads.
-  if (!isClerkConfigured()) return "anonymous";
+  if (!isClerkConfigured()) {
+    return isKeylessDevMode() ? "anonymous" : null;
+  }
   const { userId } = await auth();
   return userId;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,10 @@ export function Modal({ open, onClose, title, description, children, className, 
   const overlayRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
+  // Scoped ids: a single page can have several modals mounted, so hard-coded
+  // ids would produce duplicate labels for screen readers.
+  const titleId = useId();
+  const descriptionId = useId();
 
   useEffect(() => {
     if (!open) return;
@@ -68,8 +72,8 @@ export function Modal({ open, onClose, title, description, children, className, 
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in"
       role="dialog"
       aria-modal="true"
-      aria-labelledby={title ? "modal-title" : undefined}
-      aria-describedby={description ? "modal-description" : undefined}
+      aria-labelledby={title ? titleId : undefined}
+      aria-describedby={description ? descriptionId : undefined}
       onClick={(e) => {
         if (e.target === overlayRef.current) onClose();
       }}
@@ -85,19 +89,20 @@ export function Modal({ open, onClose, title, description, children, className, 
       >
         <div className="flex items-start justify-between p-6 border-b border-slate-200/60">
           <div>
-            <h2 id="modal-title" className="text-lg font-semibold text-slate-900">
+            <h2 id={titleId} className="text-lg font-semibold text-slate-900">
               {title}
             </h2>
             {description && (
-              <p id="modal-description" className="mt-1 text-sm text-slate-500">
+              <p id={descriptionId} className="mt-1 text-sm text-slate-500">
                 {description}
               </p>
             )}
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
-            aria-label="Close modal"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
+            aria-label="Close dialog"
           >
             <X className="h-5 w-5" />
           </button>
